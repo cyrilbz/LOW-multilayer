@@ -47,7 +47,7 @@ class parameters():
         self.dt = 0.5*3600 # time step (s)
         
         # Number of layers
-        self.nl = 100 # number of layers
+        self.nl = 40 # number of layers
       
         # Physical constant
         self.Rg = 8.314 # Ideal gas constant
