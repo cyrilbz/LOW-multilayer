@@ -20,13 +20,28 @@ my_legend = ['test']
 list_files = ['multi-high_viscosity.pkl']
 list_files = ['multi-nl1.pkl','multi-nl20.pkl','multi-nl100.pkl','multi-nl400.pkl','multi-nl800.pkl']
 my_legend = ['nl=1','nl=20','nl=100','nl=400','nl=800']
-list_files = ['multi-nl800.pkl']
-my_legend = ['nl=40']
+list_files = ['multi-nl1-corrected_P.pkl','multi-nl40-corrected_P.pkl']
+my_legend = ['nl=1','nl=40']
+list_files = ['multi-nl200-corrected_P-normal_synth.pkl','multi-nl200-corrected_P-normal_synth-low_E.pkl']
+my_legend = ['E=100MPa','E=10MPa']
+list_files = ['multi-nl40-E10MPa-100h-Lp50um-test_osmoreg-test_wallreg-higher_ext.pkl']
+my_legend = ['E=10MPa']
+list_files = ['W-cste-nl1.pkl','W-cste-nl40.pkl','W-cste-nl100.pkl','W-cste-nl200.pkl']
+my_legend = ['1l','40l','100l','200l']
+# list_files = ['nl1.pkl','nl40.pkl','nl100.pkl','nl200.pkl']
+# my_legend = ['1l','40l','100l','200l']
+# list_files = ['nl1-E10.pkl','nl40-E10.pkl']
+# my_legend = ['1l','40l','100l','200l']
+# list_files = ['nl1-test_cycle-0.5MPa.pkl','nl40-test_cycle-0.5MPa.pkl']
+# my_legend = ['nl=1','nl=40']
 # list_files = ['complete-Cs_ext200.pkl','complete-Cs_ext200-omegax2.pkl','complete-Cs_ext200-omegax0-osmoreg2.pkl']
 # my_legend = ['Cs_ext=200','Cs_ext=200 omegax2','Cs_ext=200 omegax0']
 my_color =['b','orange','green','red','magenta']
-# list_files = ['complete-Cs_ext200.pkl']
+# list_files = ['multi-nl320-E10MPa-800h.pkl']
 # my_legend = ['Cs_ext=200']
+list_files = ['W-cste-nl40-E10-high_conductivity.pkl']
+my_legend = ['1 l','40l','100l','200l']
+
 # list_files = ['complete-Cs_ext200-long.pkl','complete-Cs_ext200-n_constant.pkl','complete-Cs_ext200-PI_constant.pkl']
 # my_legend = ['Cs_ext=200','n=cste','PI=cste']
 # list_files = ['complete-Cs_ext200-dt0_5h.pkl','complete-Cs_ext200-dt2h.pkl','complete-Cs_ext200-dt4h.pkl','complete-Cs_ext200-dt10h.pkl','complete-Cs_ext200-dt50h.pkl']
@@ -56,6 +71,7 @@ for i in range(size): # loop to open the files one by one and plot things
     sp_mean = np.zeros((nt,1)) 
     P = np.zeros((nt,1)) 
     Q = np.zeros((nt,1)) 
+    my_psiX = np.zeros((nt,1)) 
     W_sum= np.zeros((nt,p.nl)) 
     
     # Data treatment
@@ -65,18 +81,27 @@ for i in range(size): # loop to open the files one by one and plot things
     VwaT = 2*WaT*p.Lz*(La-2*WpT)
     VwpT = 2*WpT*p.Lp*p.Lz
     Vh = La*p.Lp*p.Lz - VwpT- VwaT
-    Cs= ns/Vh
-    PI=Cs*p.Rg*p.T
+    Cs = ns/Vh
+    PI = Cs*p.Rg*p.T
+        
+    # Compute areas
+    Cell_area = La*p.Lp
+    Lumen_area = Vh/p.Lz
+    Wall_area = (VwpT + VwaT)/p.Lz
+    check = Wall_area+Lumen_area
     
     # Compute mean stresses and pressure
     for k in range(nt):
         sa_mean[k] = np.dot(sa[k],Wa[k])/WaT[k] # mean anticlinal stress
-        P[k] = 2*sa_mean[k]*WaT[k]/p.Lp + p.P_ext # pressure  
-        sp_mean[k] = (P[k]-p.P_ext)*La[k]/(2*WpT)
+        P[k] = 2*sa_mean[k]*WaT[k]/(p.Lp-2*WaT[k]) + p.P_ext # pressure  
+        sp_mean[k] = (P[k]-p.P_ext)*(La[k]-2*WpT)/(2*WpT)
         # Compute the flow rate   
         A = 2*p.Lz*(p.Lp+La[k]) # area for water fluxes
-        Q[k] = A*p.kh*(p.Psi_src-P[k]+PI[k]) # water fluxes
+        # my_psiX[k] = p.Psi_src + 0.5*(p.delta_PsiX)*(1+np.cos((t[k]/3600+12-0)*np.pi/12))
+        my_psiX[k] = p.Psi_src
+        Q[k] = A*p.kh*(my_psiX[k]-P[k]+PI[k]) # water fluxes
         W_sum[k]=np.cumsum(Wa[k])
+        
     
         
     # # Compute Lockhart's solution
@@ -97,8 +122,8 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.plot(th,L_th**1000000,'--k')
     # plt.plot([150, 150], [0, 84],':b',linewidth=1.5)
     # plt.plot([90, 90], [0, 42],color='orange',linewidth=1.5,linestyle=':')
-    # plt.xlim((0,300))
-    # plt.ylim((0,150))
+    # plt.xlim((80,100))
+    # plt.ylim((60,75))
     plt.legend(loc='best')
     #plt.yscale('log')
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
@@ -112,9 +137,12 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tight_layout()
     
     plt.figure(2)
+
     plt.plot(th,sa_mean/1e6,label=my_legend[i],color=my_color[i])
+    plt.legend(loc='best')
     plt.plot([0, p.t_end/3600], [1, 1],':k',linewidth=1.5)
-    # plt.ylim((0,1.1))
+    # plt.ylim((1,1.5))
+    # plt.xlim((20,60))
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
     plt.title(r"$\textbf{Mean anticlinal wall stress}$", fontsize=16)
@@ -126,7 +154,9 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tight_layout()
     
     plt.figure(3)
+    
     plt.plot(th,P/1e6,color=my_color[i])
+    #plt.legend(loc='best')
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     plt.ylabel(r"\textbf{$P$ [MPa]}", fontsize=16)
     plt.title(r"$\textbf{Turgor pressure}$", fontsize=16)
@@ -138,24 +168,26 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tight_layout()
     
     plt.figure(4)
+    
     plt.plot(th,WaT*1000000,label=my_legend[i],color=my_color[i])
+    plt.legend(loc='best')
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     plt.ylabel(r"\textbf{Wa [$\mu$m]}", fontsize=16)
     plt.title(r"$\textbf{Wall thickness}$", fontsize=16)
     # Set grid and minor ticks
-    plt.xlim((80,100))
-    plt.ylim((3.5,4.5))
+    # plt.xlim((80,100))
+    # plt.ylim((3.5,4.5))
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.minorticks_on()
     # Use LaTeX for tick labels (optional)
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    plt.figure(5)
-    plt.plot(th,PI/1e6,color=my_color[i])
-    # plt.legend(loc='best')
-    plt.xlabel('t [h]')
-    plt.ylabel('PI [MPa]')
+    # plt.figure(5)
+    # plt.plot(th,PI/1e6,color=my_color[i])
+    # # plt.legend(loc='best')
+    # plt.xlabel('t [h]')
+    # plt.ylabel('PI [MPa]')
     
     plt.figure(6)
     plt.plot(th,sp_mean/1e6,label=my_legend[i],color=my_color[i])
@@ -197,22 +229,23 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    plt.figure(9)
+    #plt.figure(9)
+    fig, ax = plt.subplots()
     # Spatio-temporal stress profile
     # Define your desired colormap (e.g., 'viridis')
     cmap = plt.cm.viridis
     
     # Select equally distributed timesteps (adjust divisor for different numbers)
-    selected_timesteps = np.linspace(10, nt-1, 8, dtype=int)  # Use np.linspace for even distribution
+    selected_timesteps = np.linspace(10, nt-1, 5, dtype=int)  # Use np.linspace for even distribution
     
     # Create a color mapper object for the selected timesteps
-    norm = plt.Normalize(vmin=selected_timesteps[0], vmax=selected_timesteps[-1])
+    norm = plt.Normalize(vmin=th[selected_timesteps[0]], vmax=th[selected_timesteps[-1]])
     sm = ScalarMappable(cmap=cmap, norm=norm)
     
     # Plot loop for each timestep
     for k,timestep in enumerate(selected_timesteps):
         # Get color based on timestep
-        color = sm.to_rgba(timestep)
+        color = sm.to_rgba(th[timestep])
         
         # Get data points where wa is not zero (boolean mask)
         mask = Wa[timestep] != 0
@@ -220,24 +253,47 @@ for i in range(size): # loop to open the files one by one and plot things
         # Filter W_sum and sa based on the mask
         W_sum_f = W_sum[timestep][mask]
         sa_f = sa[timestep][mask]
+                
+        # # Local average for non-edge elements (vectorized)
+        # W_sum_f[1:-1] = (W_sum_f[:-2] + W_sum_f[2:]) / 2
         
-        # plot at mean layer thickness values
-        if len(W_sum_f) > 1:  # Check for at least two elements
-            W_sum_f[0] = (W_sum_f[0]) / 2  # Average first element
-            W_sum_f[-1] = (W_sum_f[-1] + W_sum_f[-2]) / 2  # Average last element
-
-        # Local average for non-edge elements (vectorized)
-        W_sum_f[1:-1] = (W_sum_f[:-2] + W_sum_f[2:]) / 2
-
+        # # plot at mean layer thickness values
+        # if len(W_sum_f) > 1:  # Check for at least two elements
+        #     W_sum_f[0] = (W_sum_f[0]) / 2  # Average first element
+        #     W_sum_f[-1] = (W_sum_f[-1] + W_sum_f[-2]) / 2  # Average last element
+        # else:
+        #     W_sum_f[0] = (W_sum_f[0]) / 2 
 
         # Plot with color from colormap
-        plt.plot(W_sum_f*1e6, sa_f*1e-6, color=color, label=f'Time: {th[timestep]}',marker='.')
+        ax.plot(W_sum_f*1e6, sa_f*1e-6, color=color, label=f'Time: {th[timestep]}',marker='.')
         
+    # Add colorbar
+    fig.colorbar(sm, label='Time [h]', ax=ax)  # Add colorbar to the axes    
     #plt.plot(W_sum[-1]*1e6,sa[-1]/1e6,color=my_color[i])
     # plt.ylim((0,1.1))
+    plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, 1.75],':k',linewidth=1.5)
     plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
     plt.ylabel(r"\textbf{$\sigma_a$ [MPa]}", fontsize=16)
     plt.title(r"$\textbf{Anticlinal stress profiles}$", fontsize=16)
+    #plt.legend(loc='best')
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
+    dpi = 300  # Dots per inch
+    # Save the figure as a high-resolution JPEG
+    #plt.savefig("stress_profiles-W_cste.jpeg", dpi=dpi)
+    
+    plt.figure(10)
+    plt.plot(th,Cell_area*1e12,label='Cell area')
+    plt.plot(th,Lumen_area*1e12,label='Lumen area')
+    plt.plot(th,Wall_area*1e12,label='Wall area')
+    # plt.ylim((0,1.1))
+    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    plt.ylabel(r"\textbf{Areas in $\mu$ m$^2$}", fontsize=16)
+    plt.title(r"$\textbf{Areas}$", fontsize=16)
     plt.legend(loc='best')
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)

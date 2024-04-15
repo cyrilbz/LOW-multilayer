@@ -23,8 +23,8 @@ import os
 start_time = time.time()
 
 # Specify the output filename
-filename ='multi-nl800.pkl'
-overwrite = False # True if you want to overwrite the existing file 
+filename ='W-cste-nl40-E10-high_conductivity.pkl'
+overwrite = True # True if you want to overwrite the existing file 
 path = "../runs/" + filename
 
 if os.path.exists(path) and overwrite==False: # Check if the file already exists
@@ -40,7 +40,7 @@ def dydt(y,t,p): # all physical equations for time integration
     global iteration_count, t_target  
     
     # handle the switch from one layer to another
-    if (t_target[iteration_count]<t and iteration_count < len(t_target)-1):
+    if (t_target[iteration_count]<t and iteration_count < len(t_target)-1 and p.nl>1):
         iteration_count += 1 # switch to next layer
 
     # extract data from y vector
@@ -69,32 +69,40 @@ def dydt(y,t,p): # all physical equations for time integration
     dMmax = p.omega*Vh*np.exp(p.Eaw/p.kb*(1/p.T0-1/p.T)) # Maximal speed of mass increment 
     dMdt = dMmax*Cs/(Cs+p.Km) # Mass growth (kg/s)
     dVwadt = 1/p.rho_w*dMdt # wall synthesis in volume  
-    dnsdt = -1/p.MMs*dMdt + fs # changes in sugar content
     
     # Compute mean stresses and pressure
     sa_mean = np.dot(sa,Wa)/WaT # mean anticlinal stress
-    P = 2*sa_mean*WaT/p.Lp + p.P_ext # pressure
+    P = 2*sa_mean*WaT/(p.Lp-2*WaT) + p.P_ext # pressure
     
     # Compute water fluxes
+    my_psiX = p.Psi_src + 0.5*p.delta_PsiX*(1+np.cos((t/3600+12-0)*np.pi/12))
     A = 2*p.Lz*(p.Lp+La) # area for water fluxes
-    Q = A*p.kh*(p.Psi_src-P+PI) # water fluxes
+    Q = A*p.kh*(my_psiX-P+PI) # water fluxes
     
     # compute the anticlinal elongation rate (ERa)
-    ERa = 1/Vh*(Q+dVwadt)
+    ERa = (Q+dVwadt)/(Vh)
+    #ERa = Q/Vh*1/(1-2*WaT/p.Lp) # wall thickness regulation
     
     # Compute the anticlinal length changes
-    dLdt = ERa*La
+    dLdt=(La-2*WpT)*ERa
+    
+    # Wall synthesis when thickness regulation
+    #dVwadt=2*p.Lz*WaT*dLdt
     
     # Compute the changes in wall layer thicknesses
     dWadt = -Wa*1/(La-2*WpT)*(dLdt) # thickness evolution for all layers
     dWadt[iteration_count] += dVwadt/(2*p.Lz*(La-2*WpT)) # wall synthesis in a target layer
     #dWadt[0] += dVwadt/(2*p.Lz*(La-2*WpT)) # wall synthesis in a target layer
     
+    # compute changesin sugar content 
+    #dnsdt = -1/p.MMs*dMdt + fs # no osmoregulation
+    dnsdt = ns/Vh*(dLdt*(p.Lp*p.Lz-2*WaT*p.Lz)-2*p.Lz*sum(dWadt)*(La-2*WpT)) # omoregulation
+                
     # Compute the changes in wall stresses
     sa_subset = sa[:(iteration_count+1)]
     plasticity = np.maximum(sa_subset-p.sig_Y,np.zeros((1,iteration_count+1)))
     plasticity = plasticity.reshape((iteration_count+1, 1))  # Reshape to have one column
-    dsadt[0:iteration_count+1] = p.E*ERa-p.E/p.mu*plasticity
+    dsadt[0:iteration_count+1] = p.E*ERa -p.E/p.mu*plasticity
     #dsadt[0] = p.E*ERa-p.E/p.mu*max(sa[0]-p.sig_Y,0)
     
     # Gather the derivative vector dy/dt

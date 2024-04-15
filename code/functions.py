@@ -10,20 +10,21 @@ import numpy as np
 class parameters():
     def __init__(self):
         # Mechanical parameters
-        self.E = 100e6 # Young Modulus - it is 30e6 in [Dumais, new Phytol., 2021]
+        self.E = 10e6 # Young Modulus - it is 30e6 in [Dumais, new Phytol., 2021]
         self.mu = 0.8e10 # wall viscosity in Pa.s [Dumais, new Phytol., 2021]
-        self.mu = 10*self.mu # custom value
+        self.mu =10*self.mu # custom value
         self.sig_Y = 1e6 # Plastic threshold in Pa [user choice]
         
         # Hydraulic parameters
         self.kh = 1e-16 # hydraulic conduct in m/Pa/s [Dumais, new Phytol., 2021]
         self.Psi_src = 0 # (=P-PI)_{ext} : external (xylem) potential in Pa
+        self.delta_PsiX = 0 # water source potential amplitude
         self.P_ext = 0 # external pressure      
         self.Pi0 = 0.5e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
         
         # Wall synthesis parameters [Friend et al, Nature com., 2022]
         self.omega = 2.2e-4 # normalised rate of mass growth (kg/m3/s) at T0
-        self.omega = 2*self.omega # custom value
+        self.omega = 1*self.omega # custom value
         self.Eaw = 1.43 # activation energy for wall building (eV)
         self.kb = 8.617e-5 # Bolztmann's constant (eV/K)
         self.Km = 14.9 # Michaelis constant for wall synthesis (mol/m3)
@@ -35,7 +36,7 @@ class parameters():
         self.T = self.T0 + 15 # Actual temperature in K
         
         # Geometry
-        self.Lp = 10e-6 # initial periclinal length
+        self.Lp = 50e-6 # initial periclinal length
         self.La = 10e-6 # initial anticlnal length
         self.Lz = 10e-6 # initial anticlnal length
         self.Wa0 = 0.5e-6 # initial wall thickness in m
