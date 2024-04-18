@@ -23,7 +23,7 @@ import os
 start_time = time.time()
 
 # Specify the output filename
-filename ='W-cste-nl40-E10-high_conductivity.pkl'
+filename ='test_deposition_length.pkl'
 overwrite = True # True if you want to overwrite the existing file 
 path = "../runs/" + filename
 
@@ -32,17 +32,14 @@ if os.path.exists(path) and overwrite==False: # Check if the file already exists
    
 print("Simulation running: " + str(filename))
 
-def dydt(y,t,p): # all physical equations for time integration
-    # NB : to switch from odeint to solve_ivp 
+def dydt(t,y,p): # all physical equations for time integration
+    # NB : to switch from odeint to solve_ivp and vice versa
     # you must switch t and y in the previous line
+    # and comment/uncomment the call to the solver below
     
     # get global variables - useful to handle the multilayer approach
-    global iteration_count, t_target  
+    global iteration_count, tdepo, Ldepo
     
-    # handle the switch from one layer to another
-    if (t_target[iteration_count]<t and iteration_count < len(t_target)-1 and p.nl>1):
-        iteration_count += 1 # switch to next layer
-
     # extract data from y vector
     ns = y[0] # extract sugar content
     La = y[1] # extract cell length
@@ -55,6 +52,18 @@ def dydt(y,t,p): # all physical equations for time integration
     dsadt = np.zeros((p.nl,1)) 
     dWadt = np.zeros((p.nl,1))
     
+    # Initialize some other vectors
+    eps_t = np.zeros((p.nl)) # total deformation
+    MFA = np.zeros((p.nl)) # micro fibril angles
+    E_eff = p.E*np.ones((p.nl,1)) # effective Young's modulus
+    sig_Y_eff = p.sig_Y*np.ones((1,p.nl)) # effective yield stress
+    
+    # Go to next layer
+    # if time is sufficiently high and we did not yet reach the max number of layers (>1)
+    if (tdepo[iteration_count]<t and iteration_count < len(tdepo)-1 and p.nl>1):
+        iteration_count += 1 # switch to next layer
+        Ldepo[iteration_count] = La # save deposition length
+         
     # Compute volumes
     WaT = sum(Wa)
     WpT = p.Wp0
@@ -74,6 +83,12 @@ def dydt(y,t,p): # all physical equations for time integration
     sa_mean = np.dot(sa,Wa)/WaT # mean anticlinal stress
     P = 2*sa_mean*WaT/(p.Lp-2*WaT) + p.P_ext # pressure
     
+    # Compute the total deformation and MFA related quantitites
+    eps_t[:(iteration_count+1)] = (La - Ldepo[:(iteration_count+1)])/Ldepo[:(iteration_count+1)]
+    MFA = np.arctan(np.tan(p.MFA0)*np.exp(eps_t)) # MFA evolution
+    s_MF = sa/2*(1+np.cos(2*MFA)) # traction in the MF axis
+    tau_MF = -sa/2*np.sin(2*MFA) # shear in the MF frame
+
     # Compute water fluxes
     my_psiX = p.Psi_src + 0.5*p.delta_PsiX*(1+np.cos((t/3600+12-0)*np.pi/12))
     A = 2*p.Lz*(p.Lp+La) # area for water fluxes
@@ -100,9 +115,9 @@ def dydt(y,t,p): # all physical equations for time integration
                 
     # Compute the changes in wall stresses
     sa_subset = sa[:(iteration_count+1)]
-    plasticity = np.maximum(sa_subset-p.sig_Y,np.zeros((1,iteration_count+1)))
+    plasticity = np.maximum(sa_subset-sig_Y_eff[0][:(iteration_count+1)],np.zeros((1,iteration_count+1)))
     plasticity = plasticity.reshape((iteration_count+1, 1))  # Reshape to have one column
-    dsadt[0:iteration_count+1] = p.E*ERa -p.E/p.mu*plasticity
+    dsadt[0:iteration_count+1] = E_eff[:(iteration_count+1)]*(ERa - 1/p.mu*plasticity)
     #dsadt[0] = p.E*ERa-p.E/p.mu*max(sa[0]-p.sig_Y,0)
     
     # Gather the derivative vector dy/dt
@@ -115,19 +130,27 @@ def dydt(y,t,p): # all physical equations for time integration
 ######### Main program ##########
 p = parameters() # get all parameters       
 t = np.arange(p.t0,p.t_end+p.dt,p.dt) # time vector
-t_target = np.linspace(p.t0, p.t_end, p.nl, endpoint=True) # target time values for new layer creation
+
+# Intial values
 sa0 = p.sig_a0*np.ones(p.nl) # all layers with the same initial stress
 Wa0 = np.zeros(p.nl) # intialize all layers with zero thickness
 Wa0[0] = p.Wa0 # initial first layer
 y0 = [p.ns0,p.La] # initial values 
 y0 = np.append(y0,sa0) # combine
 y0 = np.append(y0,Wa0) # combine
+
+# Handle multilayer aproach
 iteration_count = 0 # Initialize global variable
-# sol = solve_ivp(dydt, [p.t0 , p.t_end+p.dt], y0, tspan=t,args=(p,)) # resolution
-sol = odeint(dydt, y0, t, args=(p,)) # resolution
+tdepo = np.linspace(p.t0+p.tfirstlayer, p.t_end, p.nl, endpoint=False) # target time values for new layer creation
+Ldepo = np.zeros(p.nl) # vector to store all deposition length to compute total deformation
+Ldepo[0] = p.La # first layer already deposited
+
+# Resolution
+sol = solve_ivp(dydt, [p.t0 , p.t_end+p.dt], y0, args=(p,), method='RK45') 
+#sol = odeint(dydt, y0, t, args=(p,)) 
 
 ######## Store solution #########
-data = data2save(p,t,sol) # create data structure
+data = data2save(p,t,sol,tdepo,Ldepo) # create data structure
 with open(path, "wb") as file: # open file
     pickle.dump(data, file) # save data
 

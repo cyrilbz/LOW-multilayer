@@ -5,7 +5,7 @@ Created on Mon Mar 18 13:59:24 2024
 @author: cbozonnet
 """
 
-
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
@@ -39,7 +39,7 @@ my_legend = ['1l','40l','100l','200l']
 my_color =['b','orange','green','red','magenta']
 # list_files = ['multi-nl320-E10MPa-800h.pkl']
 # my_legend = ['Cs_ext=200']
-list_files = ['W-cste-nl40-E10-high_conductivity.pkl']
+list_files = ['test_deposition_length-W_cste.pkl']
 my_legend = ['1 l','40l','100l','200l']
 
 # list_files = ['complete-Cs_ext200-long.pkl','complete-Cs_ext200-n_constant.pkl','complete-Cs_ext200-PI_constant.pkl']
@@ -54,9 +54,11 @@ for i in range(size): # loop to open the files one by one and plot things
     path = "../runs/" + list_files[i]
     with open(path, "rb") as file:
         data = pickle.load(file)
-    sol = data.sol
-    p = data.p
-    t = data.t
+    sol = data.sol # get solution
+    p = data.p # get parameters
+    t = data.t # get time vector
+    tdepo = data.tdepo # get deposition time vector
+    Ldepo= data.Ldepo
     nt = len(t) # number of iterations
     
     ####### Post process #########
@@ -72,7 +74,10 @@ for i in range(size): # loop to open the files one by one and plot things
     P = np.zeros((nt,1)) 
     Q = np.zeros((nt,1)) 
     my_psiX = np.zeros((nt,1)) 
-    W_sum= np.zeros((nt,p.nl)) 
+    W_sum = np.zeros((nt,p.nl)) 
+    eps_t = np.zeros((p.nl,nt)) # prepare space for total deformation 
+    s_MF = np.zeros((nt,p.nl))
+    tau_MF = np.zeros((nt,p.nl))
     
     # Data treatment
     th=t/3600 # time in hours
@@ -100,10 +105,24 @@ for i in range(size): # loop to open the files one by one and plot things
         # my_psiX[k] = p.Psi_src + 0.5*(p.delta_PsiX)*(1+np.cos((t[k]/3600+12-0)*np.pi/12))
         my_psiX[k] = p.Psi_src
         Q[k] = A*p.kh*(my_psiX[k]-P[k]+PI[k]) # water fluxes
-        W_sum[k]=np.cumsum(Wa[k])
+        W_sum[k]=np.cumsum(Wa[k]) # total wall thickness
         
+        
+    for k in range(p.nl): # move across all layers
+        if (k==0):
+            mask = (t>=0) # filter when the layer has not been created
+        else:
+            mask = (t>tdepo[k-1]) # filter when the layer has not been created
+        eps_t[k][mask] = (La[mask]-Ldepo[k])/Ldepo[k]  # compute total deformation
+
+    eps_t = np.transpose(eps_t) # transpose the matrix to be consistent with other matrix      
+    phi0 = 5*np.pi/180 # MFA at deposition
+    MFA = np.arctan(np.tan(phi0)*np.exp(eps_t)) # micro-fibril angle evolution
     
-        
+    for k in range(p.nl):
+        s_MF[:,k] = sa[:,k]/2*(1+np.cos(2*MFA[:,k])) # traction in the MF axis
+        tau_MF[:,k] = -sa[:,k]/2*np.sin(2*MFA[:,k]) # shear in the MF frame
+
     # # Compute Lockhart's solution
     # # NB: to match with it 
     # # you should take W -> 0 in the parameters
@@ -295,6 +314,61 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.ylabel(r"\textbf{Areas in $\mu$ m$^2$}", fontsize=16)
     plt.title(r"$\textbf{Areas}$", fontsize=16)
     plt.legend(loc='best')
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
+    
+    plt.figure(11)
+    plt.plot(th,eps_t*100)
+    # plt.ylim((0,1.1))
+    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    plt.ylabel(r"\textbf{$\varepsilon_T [\%]$}", fontsize=16)
+    plt.title(r"$\textbf{Total deformation in \%}$", fontsize=16)
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
+    
+    plt.figure(12)
+    plt.plot(th,MFA*180/np.pi)
+    # plt.ylim((0,1.1))
+    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    plt.ylabel(r"\textbf{MFA in degrees}", fontsize=16)
+    plt.title(r"$\textbf{MFA changes for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
+    
+    plt.figure(13)
+    plt.hist(MFA[-1]*180/np.pi,bins=20,density=True)
+    # plt.ylim((0,1.1))
+    plt.xlabel(r"\textbf{MFA range}", fontsize=16)
+    plt.ylabel(r"\textbf{PDF}", fontsize=16)
+    plt.title(r"$\textbf{MFA final distribution}$", fontsize=16)
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
+    
+    plt.figure(14)
+    plt.plot(th,s_MF[:,0]/1e6,label='Tensile stress in the MF frame')
+    plt.plot(th,tau_MF[:,0]/1e6,label='Shear stress in the MF frame',linestyle=':')
+    plt.plot(th,sa[:,0]/1e6,label='Tensile stress in the reference frame',linestyle='--')
+    # plt.ylim((0,1.1))
+    plt.legend(loc='best')
+    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    plt.ylabel(r"\textbf{Stress [MPa]}", fontsize=16)
+    plt.title(r"$\textbf{Stresses in the different frames}$", fontsize=16)
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.minorticks_on()

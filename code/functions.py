@@ -41,6 +41,8 @@ class parameters():
         self.Lz = 10e-6 # initial anticlnal length
         self.Wa0 = 0.5e-6 # initial wall thickness in m
         self.Wp0 = 0.5e-6 # initial wall thickness in m
+        self.MFA0_deg = 5 # initial MFA angle in degrees
+        self.MFA0 = self.MFA0_deg*np.pi/180
         
         # Simulation parameters
         self.t0 = 0
@@ -49,6 +51,7 @@ class parameters():
         
         # Number of layers
         self.nl = 40 # number of layers
+        self.tfirstlayer = (self.t_end - self.t0)/self.nl
       
         # Physical constant
         self.Rg = 8.314 # Ideal gas constant
@@ -66,7 +69,9 @@ class parameters():
         self.sig_a0 = self.P0*self.Lp/(2*self.Wa0) # intial wall stress
         
 class data2save: # this creates a structure to save all datas
-    def __init__(self, p, t, sol):
+    def __init__(self, p, t, sol,tdepo,Ldepo):
         self.p = p
         self.t = t
         self.sol = sol
+        self.tdepo = tdepo
+        self.Ldepo = Ldepo
