@@ -38,7 +38,7 @@ class parameters():
         # Geometry
         self.Lp = 50e-6 # initial periclinal length
         self.La = 10e-6 # initial anticlnal length
-        self.Lz = 10e-6 # initial anticlnal length
+        self.Lz = 10e-6 # initial longitudinal length
         self.Wa0 = 0.5e-6 # initial wall thickness in m
         self.Wp0 = 0.5e-6 # initial wall thickness in m
         self.MFA0_deg = 5 # initial MFA angle in degrees
@@ -67,6 +67,12 @@ class parameters():
         self.ns0 = self.Vh0*self.Pi0/(self.Rg*self.T) # intial sugar content
         self.P0 = 0 # self.sig_Y*2*self.W0/self.R0 # initial turgor pressure in Pa
         self.sig_a0 = self.P0*self.Lp/(2*self.Wa0) # intial wall stress
+        
+        # compute inital alpha parameter (Lockhart like)
+        A0 = 2*self.Lz*(self.Lp + self.La)
+        phia0 = A0*self.kh/self.Vh0 # hydraulic conductivity parameter
+        phiw = 1/self.mu # extensibility
+        self.alpha = phia0/(phia0+phiw) 
         
 class data2save: # this creates a structure to save all datas
     def __init__(self, p, t, sol,tdepo,Ldepo):

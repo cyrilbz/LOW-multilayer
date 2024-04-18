@@ -39,8 +39,10 @@ my_legend = ['1l','40l','100l','200l']
 my_color =['b','orange','green','red','magenta']
 # list_files = ['multi-nl320-E10MPa-800h.pkl']
 # my_legend = ['Cs_ext=200']
-list_files = ['test_deposition_length-W_cste.pkl']
+list_files = ['khx1-odeint.pkl']
 my_legend = ['1 l','40l','100l','200l']
+list_files = ['khx1.pkl','khx2.pkl','khx4.pkl','khx8.pkl']
+my_legend = ['Khx1','Khx2','Khx4','Khx8']
 
 # list_files = ['complete-Cs_ext200-long.pkl','complete-Cs_ext200-n_constant.pkl','complete-Cs_ext200-PI_constant.pkl']
 # my_legend = ['Cs_ext=200','n=cste','PI=cste']
@@ -54,7 +56,9 @@ for i in range(size): # loop to open the files one by one and plot things
     path = "../runs/" + list_files[i]
     with open(path, "rb") as file:
         data = pickle.load(file)
+    #sol = data.sol.y # get solution
     sol = data.sol # get solution
+    #sol = np.transpose(sol)
     p = data.p # get parameters
     t = data.t # get time vector
     tdepo = data.tdepo # get deposition time vector

@@ -23,7 +23,7 @@ import os
 start_time = time.time()
 
 # Specify the output filename
-filename ='test_deposition_length.pkl'
+filename ='khx16.pkl'
 overwrite = True # True if you want to overwrite the existing file 
 path = "../runs/" + filename
 
@@ -32,7 +32,8 @@ if os.path.exists(path) and overwrite==False: # Check if the file already exists
    
 print("Simulation running: " + str(filename))
 
-def dydt(t,y,p): # all physical equations for time integration
+
+def dydt(y,t,p): # all physical equations for time integration
     # NB : to switch from odeint to solve_ivp and vice versa
     # you must switch t and y in the previous line
     # and comment/uncomment the call to the solver below
@@ -128,7 +129,8 @@ def dydt(t,y,p): # all physical equations for time integration
     return dy 
 
 ######### Main program ##########
-p = parameters() # get all parameters       
+p = parameters() # get all parameters  
+print("Alpha=" + str(p.alpha))     
 t = np.arange(p.t0,p.t_end+p.dt,p.dt) # time vector
 
 # Intial values
@@ -146,8 +148,8 @@ Ldepo = np.zeros(p.nl) # vector to store all deposition length to compute total 
 Ldepo[0] = p.La # first layer already deposited
 
 # Resolution
-sol = solve_ivp(dydt, [p.t0 , p.t_end+p.dt], y0, args=(p,), method='RK45') 
-#sol = odeint(dydt, y0, t, args=(p,)) 
+#sol = solve_ivp(dydt, [p.t0 , p.t_end+p.dt], y0, args=(p,),t_eval=t, method='RK45') 
+sol = odeint(dydt, y0, t, args=(p,)) 
 
 ######## Store solution #########
 data = data2save(p,t,sol,tdepo,Ldepo) # create data structure
