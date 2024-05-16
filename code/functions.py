@@ -9,18 +9,24 @@ import numpy as np
 
 class parameters():
     def __init__(self):
+        
+        # activate wall synthesis regulation
+        self.wall_regul = True
+        
         # Mechanical parameters
-        self.E = 10e6 # Young Modulus - it is 30e6 in [Dumais, new Phytol., 2021]
+        self.E = 100e6 # Young Modulus - it is 30e6 in [Dumais, new Phytol., 2021]
         self.mu = 0.8e10 # wall viscosity in Pa.s [Dumais, new Phytol., 2021]
-        self.mu =10*self.mu # custom value
-        self.sig_Y = 1e6 # Plastic threshold in Pa [user choice]
+        tau = 10 * 3600
+        #self.mu = 500*self.mu # custom value
+        self.mu = self.E*tau
+        self.sig_Y = 5e6 # Plastic threshold in Pa [user choice]
         
         # Hydraulic parameters
-        self.kh = 1e-16 # hydraulic conduct in m/Pa/s [Dumais, new Phytol., 2021]
+        self.kh = 1000*1e-16 # hydraulic conduct in m/Pa/s [Dumais, new Phytol., 2021]
         self.Psi_src = 0 # (=P-PI)_{ext} : external (xylem) potential in Pa
         self.delta_PsiX = 0 # water source potential amplitude
         self.P_ext = 0 # external pressure      
-        self.Pi0 = 0.5e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
+        self.Pi0 = 1e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
         
         # Wall synthesis parameters [Friend et al, Nature com., 2022]
         self.omega = 2.2e-4 # normalised rate of mass growth (kg/m3/s) at T0
@@ -36,17 +42,17 @@ class parameters():
         self.T = self.T0 + 15 # Actual temperature in K
         
         # Geometry
-        self.Lp = 50e-6 # initial periclinal length
+        self.Lp = 20e-6 # initial periclinal length
         self.La = 10e-6 # initial anticlnal length
         self.Lz = 10e-6 # initial longitudinal length
-        self.Wa0 = 0.5e-6 # initial wall thickness in m
-        self.Wp0 = 0.5e-6 # initial wall thickness in m
+        self.Wa0 = 1e-6 # initial wall thickness in m
+        self.Wp0 = 1e-6 # initial wall thickness in m
         self.MFA0_deg = 5 # initial MFA angle in degrees
         self.MFA0 = self.MFA0_deg*np.pi/180
         
         # Simulation parameters
         self.t0 = 0
-        self.t_end = 100*3600 # final time (s)
+        self.t_end = 200*3600 # final time (s)
         self.dt = 0.5*3600 # time step (s)
         
         # Number of layers
@@ -65,13 +71,13 @@ class parameters():
         VwpT0 =2*self.Wp0*self.Lz*self.Lp # pericl. wall volume
         self.Vh0 = self.La*self.Lp*self.Lz - VwaT0 - VwpT0  #init. water volume
         self.ns0 = self.Vh0*self.Pi0/(self.Rg*self.T) # intial sugar content
-        self.P0 = 0 # self.sig_Y*2*self.W0/self.R0 # initial turgor pressure in Pa
+        self.P0 = 0#self.sig_Y*2*self.Wa0/(self.Lp-2*self.Wa0) # initial turgor pressure in Pa
         self.sig_a0 = self.P0*self.Lp/(2*self.Wa0) # intial wall stress
         
         # compute inital alpha parameter (Lockhart like)
         A0 = 2*self.Lz*(self.Lp + self.La)
         phia0 = A0*self.kh/self.Vh0 # hydraulic conductivity parameter
-        phiw = 1/self.mu # extensibility
+        phiw = 1/self.mu*(self.Lp-2*self.Wp0)/(2*self.Wp0) # extensibility
         self.alpha = phia0/(phia0+phiw) 
         
 class data2save: # this creates a structure to save all datas

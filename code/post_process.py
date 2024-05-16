@@ -9,6 +9,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
+from scipy.integrate import odeint, solve_ivp
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 import pickle
@@ -36,13 +37,16 @@ my_legend = ['1l','40l','100l','200l']
 # my_legend = ['nl=1','nl=40']
 # list_files = ['complete-Cs_ext200.pkl','complete-Cs_ext200-omegax2.pkl','complete-Cs_ext200-omegax0-osmoreg2.pkl']
 # my_legend = ['Cs_ext=200','Cs_ext=200 omegax2','Cs_ext=200 omegax0']
-my_color =['b','orange','green','red','magenta']
+my_color =['b','orange','magenta','red','green']
 # list_files = ['multi-nl320-E10MPa-800h.pkl']
 # my_legend = ['Cs_ext=200']
-list_files = ['khx1-odeint.pkl']
-my_legend = ['1 l','40l','100l','200l']
-list_files = ['khx1.pkl','khx2.pkl','khx4.pkl','khx8.pkl']
-my_legend = ['Khx1','Khx2','Khx4','Khx8']
+list_files = ['Lockhart-mux10.pkl','Lockhart-mux10-nl40.pkl']
+list_files = ['W_variable-mux1-nl40.pkl','W_variable-mux100-nl40.pkl','W_variable-mux1000-nl40.pkl','W_variable-mux10000-nl40.pkl']
+list_files = ['W_variable-khx1.pkl','W_variable-khx5.pkl','W_variable-khx10.pkl','W_variable-khx100.pkl']
+# my_legend = ['1 l','40l','100l','200l']
+#list_files = ['Lockhart-khx1.pkl','Lockhart-khx10.pkl','Lockhart-khx100.pkl']
+#my_legend = ['Khx1','Khx2','Khx10']
+list_files = ['test_tancrede.pkl']
 
 # list_files = ['complete-Cs_ext200-long.pkl','complete-Cs_ext200-n_constant.pkl','complete-Cs_ext200-PI_constant.pkl']
 # my_legend = ['Cs_ext=200','n=cste','PI=cste']
@@ -64,6 +68,7 @@ for i in range(size): # loop to open the files one by one and plot things
     tdepo = data.tdepo # get deposition time vector
     Ldepo= data.Ldepo
     nt = len(t) # number of iterations
+    my_legend[i] = f"{p.alpha:.2f}"
     
     ####### Post process #########
     # extract data from solution
@@ -77,6 +82,7 @@ for i in range(size): # loop to open the files one by one and plot things
     sp_mean = np.zeros((nt,1)) 
     P = np.zeros((nt,1)) 
     Q = np.zeros((nt,1)) 
+    G = np.zeros((nt,1)) 
     my_psiX = np.zeros((nt,1)) 
     W_sum = np.zeros((nt,p.nl)) 
     eps_t = np.zeros((p.nl,nt)) # prepare space for total deformation 
@@ -110,6 +116,11 @@ for i in range(size): # loop to open the files one by one and plot things
         my_psiX[k] = p.Psi_src
         Q[k] = A*p.kh*(my_psiX[k]-P[k]+PI[k]) # water fluxes
         W_sum[k]=np.cumsum(Wa[k]) # total wall thickness
+        G[k] = Q[k]/Vh[k] # wall synthesis regulation
+        dMmax = p.omega*Vh[k]*np.exp(p.Eaw/p.kb*(1/p.T0-1/p.T))
+        dVaTdt =  dMmax/p.rho_w*Cs[k]/(Cs[k]+p.Km)
+        if (p.wall_regul==False):
+            G[k] = (1-2*WaT[k]/p.Lp)*(Q[k]+dVaTdt)/Vh[k] # G with synthesis non regulated
         
         
     for k in range(p.nl): # move across all layers
@@ -127,27 +138,41 @@ for i in range(size): # loop to open the files one by one and plot things
         s_MF[:,k] = sa[:,k]/2*(1+np.cos(2*MFA[:,k])) # traction in the MF axis
         tau_MF[:,k] = -sa[:,k]/2*np.sin(2*MFA[:,k]) # shear in the MF frame
 
-    # # Compute Lockhart's solution
-    # # NB: to match with it 
-    # # you should take W -> 0 in the parameters
-    # # In addition to osmoregulation & no wall synthesis
-    # Py0 = p.sig_Y*2*p.W0/p.R0 # yield pressure
-    # # corrected wall synthesis rate
-    # phi_w_star = p.phi_w*p.R0/(2*p.W0)*(1+2*p.W0/p.R0)
-    # # Compute growth rate
-    # Gth_cor = phi_w_star*p.phi_h/(phi_w_star+p.phi_h)*(p.Psi_src+p.Pi0-Py0)
-    # # exponential growth
-    # L_th = p.L0*np.exp(Gth_cor*th*3600)
+    # # Compute the theoretical (Lockhart like) solution
+    # def lockhart_cambium(y,t,p):
+    #     Lth = y # cell length
+    #     PM = p.Psi_src + p.Pi0 # motor power
+    #     Py0 = p.sig_Y*2*p.Wa0/(p.Lp-2*p.Wa0) # yield pressure
+    #     phi_w = 1/p.mu*(p.Lp-2*p.Wa0)/(2*p.Wa0)
+    #     phi_a = 2*(Lth + p.Lp)/((Lth-2*p.Wp0)*(p.Lp-2*p.Wa0))*p.kh
+    #     alpha = phi_a/(phi_a+phi_w)
+    #     dydt = (Lth-2*p.Wp0)*alpha*phi_w*(PM-Py0)
+    #     return dydt 
+    
+    # lock = odeint(lockhart_cambium, p.La, t, args=(p,))
+    
+    # Compute pressure and growth rate using (adapted) Lockhart solution
+    PM = p.Psi_src + p.Pi0 # motor power
+    # Py0 = p.sig_Y*2*p.Wa0/(p.Lp-2*p.Wa0) # yield pressure
+    # phi_w = 1/p.mu*(p.Lp-2*p.Wa0)/(2*p.Wa0)
+    # phi_a = 2*(La + p.Lp)/((La-2*p.Wp0)*(p.Lp-2*p.Wa0))*p.kh
+    Py0 = p.sig_Y*2*WaT/(p.Lp-2*WaT) # yield pressure
+    phi_w = 1/p.mu*(p.Lp-2*WaT)/(2*WaT) # no synthesis case
+    #phi_w = 1/p.mu*(p.Lp)/(2*WaT) # synthesis case
+    phi_a = 2*(La + p.Lp)/((La-2*p.Wp0)*(p.Lp-2*WaT))*p.kh
+    alpha = phi_a/(phi_a+phi_w)
+    P_lock = alpha*PM + (1-alpha)*Py0 # no synthesis case
+    #P_lock = alpha*PM + (1-alpha)*Py0 + p.omega/p.rho_w/(phi_a+phi_w)*1/(1+p.Rg*p.T*p.Km/PI)# synthesis case
+    G_lock = alpha*phi_w*(PM-Py0) #+ p.omega/p.rho_w*alpha*1/(1+p.Rg*p.T*p.Km/PI)
     
     ######### Plots ##########
     plt.figure(1)
     plt.plot(th,(La)*1000000,label=my_legend[i],color=my_color[i])
-    # plt.plot(th,L_th**1000000,'--k')
     # plt.plot([150, 150], [0, 84],':b',linewidth=1.5)
     # plt.plot([90, 90], [0, 42],color='orange',linewidth=1.5,linestyle=':')
-    # plt.xlim((80,100))
-    # plt.ylim((60,75))
-    plt.legend(loc='best')
+    # plt.xlim((0,100))
+    # plt.ylim((0,1000))
+    plt.legend(loc='best',title=r"$\alpha_0$")
     #plt.yscale('log')
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     plt.ylabel(r"\textbf{R [$\mu$m]}", fontsize=16)
@@ -162,8 +187,8 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.figure(2)
 
     plt.plot(th,sa_mean/1e6,label=my_legend[i],color=my_color[i])
-    plt.legend(loc='best')
-    plt.plot([0, p.t_end/3600], [1, 1],':k',linewidth=1.5)
+    plt.legend(loc='best',title=r"$\alpha_0$")
+    plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
     # plt.ylim((1,1.5))
     # plt.xlim((20,60))
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
@@ -177,9 +202,9 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tight_layout()
     
     plt.figure(3)
-    
-    plt.plot(th,P/1e6,color=my_color[i])
-    #plt.legend(loc='best')
+    plt.plot(th,P/1e6,color=my_color[i],label=my_legend[i])    
+    # plt.plot(th,P_lock/1e6,marker='v', markevery=8, linestyle='',color=my_color[i])
+    plt.legend(loc='best',title=r"$\alpha_0$")
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     plt.ylabel(r"\textbf{$P$ [MPa]}", fontsize=16)
     plt.title(r"$\textbf{Turgor pressure}$", fontsize=16)
@@ -206,11 +231,11 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    # plt.figure(5)
-    # plt.plot(th,PI/1e6,color=my_color[i])
-    # # plt.legend(loc='best')
-    # plt.xlabel('t [h]')
-    # plt.ylabel('PI [MPa]')
+    plt.figure(5)
+    plt.plot(th,PI/1e6,color=my_color[i])
+    # plt.legend(loc='best')
+    plt.xlabel('t [h]')
+    plt.ylabel('PI [MPa]')
     
     plt.figure(6)
     plt.plot(th,sp_mean/1e6,label=my_legend[i],color=my_color[i])
@@ -294,7 +319,7 @@ for i in range(size): # loop to open the files one by one and plot things
     fig.colorbar(sm, label='Time [h]', ax=ax)  # Add colorbar to the axes    
     #plt.plot(W_sum[-1]*1e6,sa[-1]/1e6,color=my_color[i])
     # plt.ylim((0,1.1))
-    plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, 1.75],':k',linewidth=1.5)
+    plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, np.max(np.max(sa, axis=1))/1e6],':k',linewidth=1.5)
     plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
     plt.ylabel(r"\textbf{$\sigma_a$ [MPa]}", fontsize=16)
     plt.title(r"$\textbf{Anticlinal stress profiles}$", fontsize=16)
@@ -315,7 +340,7 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.plot(th,Wall_area*1e12,label='Wall area')
     # plt.ylim((0,1.1))
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{Areas in $\mu$ m$^2$}", fontsize=16)
+    plt.ylabel(r"\textbf{Areas in $\mu$m$^2$}", fontsize=16)
     plt.title(r"$\textbf{Areas}$", fontsize=16)
     plt.legend(loc='best')
     # Set grid and minor ticks
@@ -329,7 +354,7 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.plot(th,eps_t*100)
     # plt.ylim((0,1.1))
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{$\varepsilon_T [\%]$}", fontsize=16)
+    plt.ylabel(r"\textbf{$\varepsilon_T$ $[\%]$}", fontsize=16)
     plt.title(r"$\textbf{Total deformation in \%}$", fontsize=16)
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
@@ -373,6 +398,22 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     plt.ylabel(r"\textbf{Stress [MPa]}", fontsize=16)
     plt.title(r"$\textbf{Stresses in the different frames}$", fontsize=16)
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
+    
+    plt.figure(15)
+    plt.plot(th,G*3600,label=my_legend[i],color=my_color[i])
+    plt.plot(th,G_lock*3600,marker='v', markevery=8, linestyle='',color=my_color[i])
+    # plt.ylim((0,1.1))
+    plt.yscale('log')
+    plt.legend(loc='best',title=r"$\alpha_0$")
+    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    plt.ylabel(r"\textbf{Growth rate [1/h]}", fontsize=16)
+    plt.title(r"$\textbf{Growth rate}$", fontsize=16)
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.minorticks_on()

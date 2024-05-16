@@ -23,7 +23,7 @@ import os
 start_time = time.time()
 
 # Specify the output filename
-filename ='khx16.pkl'
+filename ='test_tancrede3.pkl'
 overwrite = True # True if you want to overwrite the existing file 
 path = "../runs/" + filename
 
@@ -96,14 +96,14 @@ def dydt(y,t,p): # all physical equations for time integration
     Q = A*p.kh*(my_psiX-P+PI) # water fluxes
     
     # compute the anticlinal elongation rate (ERa)
-    ERa = (Q+dVwadt)/(Vh)
-    #ERa = Q/Vh*1/(1-2*WaT/p.Lp) # wall thickness regulation
+    ERa = (1-2*WaT/p.Lp)*(Q+dVwadt)/Vh
+    if (p.wall_regul==True): ERa = Q/Vh # wall thickness regulation
     
     # Compute the anticlinal length changes
     dLdt=(La-2*WpT)*ERa
     
     # Wall synthesis when thickness regulation
-    #dVwadt=2*p.Lz*WaT*dLdt
+    if (p.wall_regul==True): dVwadt=2*p.Lz*WaT*dLdt
     
     # Compute the changes in wall layer thicknesses
     dWadt = -Wa*1/(La-2*WpT)*(dLdt) # thickness evolution for all layers
@@ -143,7 +143,7 @@ y0 = np.append(y0,Wa0) # combine
 
 # Handle multilayer aproach
 iteration_count = 0 # Initialize global variable
-tdepo = np.linspace(p.t0+p.tfirstlayer, p.t_end, p.nl, endpoint=False) # target time values for new layer creation
+tdepo = np.linspace(p.t0+p.tfirstlayer, p.t_end, p.nl, endpoint=True) # target time values for new layer creation
 Ldepo = np.zeros(p.nl) # vector to store all deposition length to compute total deformation
 Ldepo[0] = p.La # first layer already deposited
 
