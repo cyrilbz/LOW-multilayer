@@ -35,3 +35,9 @@ E2 = Em*(1+xi*eta_T*Vf)/(1-eta_T*Vf)/1e6
 G12 = Gm*(1+xi*eta_G*Vf)/(1-eta_G*Vf)/1e6
 nu12 = num*(1+xi*eta_nu*Vf)/(1-eta_nu*Vf)
 nu21 = nu12*E2/E1
+
+# compute elastic matrix coefiicient:
+Q11 = E1/(1-nu12*nu21)
+Q22 = E2/(1-nu12*nu21)
+Q12 = nu21*Q11
+Q66 = G12

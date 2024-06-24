@@ -329,5 +329,12 @@ Thus the full solution can be computed.
 Note that the different procedures described in this document have to be computed for all layers, as the MF angle is different from one layer to another and these layers have not been deposited at the same time. Only the mechanical properties in the MF frame (the coefficient of the rigidity matrix $\overline{\overline{Q}})$ as well as  the ellipsoid parameters are the same for all layers. 
 
 The procedure to compute the yield threshold in the MF frame will be encapsulated in a function that outputs the yield threshold for all wall layers and that takes as inputs the elastic properties and all wall layer stresses.
+
+	\begin{figure}[h]
+	\centering
+	{\includegraphics[width=0.5\textwidth]{ellipsoid_result.png}}
+	\caption{And it works! The blue point cloud is the ideal ellipsoid. Its parameters were computed using the actual elastic parameters in table 1. The red square is the arbitrary outside point ($y$) and the red triangle is the point found by the algorithm ($x$). The red line links the outside point and its projection onto the ellispoid. }
+	\label{fig2}
+\end{figure}
 \bibliography{biblio}
 \end{document}
