@@ -15,7 +15,7 @@ Created on Tue Mar  5 16:40:39 2024
 import numpy as np
 from scipy.integrate import odeint, solve_ivp
 import pickle
-from functions import data2save, parameters
+from functions import data2save, parameters, rotation_matrix_vectorized
 import time
 import os
 
@@ -23,7 +23,7 @@ import os
 start_time = time.time()
 
 # Specify the output filename
-filename ='test_tancrede3.pkl'
+filename ='test_fibrils.pkl'
 overwrite = True # True if you want to overwrite the existing file 
 path = "../runs/" + filename
 
@@ -45,12 +45,16 @@ def dydt(y,t,p): # all physical equations for time integration
     ns = y[0] # extract sugar content
     La = y[1] # extract cell length
     sa = y[2:2+p.nl] # extract anticlinal stress
-    Wa = y[2+p.nl:2+2*p.nl+1] # extract anticlinal wall thickness
+    sl = y[2+p.nl:2+2*p.nl] # extract longitudinal stress
+    tau = y[2+2*p.nl:2+3*p.nl] # extract longitudinal stress
+    Wa = y[2+3*p.nl:2+4*p.nl+1] # extract anticlinal wall thickness
 
     # Initialize time derivatives
     dnsdt = 0
     dLdt = 0
-    dsadt = np.zeros((p.nl,1)) 
+    dsadt = np.zeros((p.nl,1))
+    dsldt = np.zeros((p.nl,1)) 
+    dtaudt = np.zeros((p.nl,1)) 
     dWadt = np.zeros((p.nl,1))
     
     # Initialize some other vectors
@@ -86,9 +90,7 @@ def dydt(y,t,p): # all physical equations for time integration
     
     # Compute the total deformation and MFA related quantitites
     eps_t[:(iteration_count+1)] = (La - Ldepo[:(iteration_count+1)])/Ldepo[:(iteration_count+1)]
-    MFA = np.arctan(np.tan(p.MFA0)*np.exp(eps_t)) # MFA evolution
-    s_MF = sa/2*(1+np.cos(2*MFA)) # traction in the MF axis
-    tau_MF = -sa/2*np.sin(2*MFA) # shear in the MF frame
+    MFA = np.arctan(np.tan(p.MFA0)*np.exp(eps_t)) # MFA evolution   
 
     # Compute water fluxes
     my_psiX = p.Psi_src + 0.5*p.delta_PsiX*(1+np.cos((t/3600+12-0)*np.pi/12))
@@ -113,16 +115,39 @@ def dydt(y,t,p): # all physical equations for time integration
     # compute changesin sugar content 
     #dnsdt = -1/p.MMs*dMdt + fs # no osmoregulation
     dnsdt = ns/Vh*(dLdt*(p.Lp*p.Lz-2*WaT*p.Lz)-2*p.Lz*sum(dWadt)*(La-2*WpT)) # omoregulation
-                
-    # Compute the changes in wall stresses
-    sa_subset = sa[:(iteration_count+1)]
-    plasticity = np.maximum(sa_subset-sig_Y_eff[0][:(iteration_count+1)],np.zeros((1,iteration_count+1)))
-    plasticity = plasticity.reshape((iteration_count+1, 1))  # Reshape to have one column
-    dsadt[0:iteration_count+1] = E_eff[:(iteration_count+1)]*(ERa - 1/p.mu*plasticity)
+    
+    # Compute rotation matrix and compute strains in the MF frame
+    Rotate = rotation_matrix_vectorized(MFA) # a nlx3x3 rotation matrix
+    eps_MF = Rotate @ np.array((ERa,0,0)) # a nlx3 matrix containing all deformation rates
+    eps_MF_tr = np.transpose(eps_MF) # 3 x nl matrix
+  
+    # Compute the changes in wall stresses in the MF frame
+    # first compute elastic component
+    dsdt = p.C_el @ eps_MF_tr # gives a 3xnl stress changes matrix
+    
+    # Put it back in the reference frame
+    Contra_Rotate = rotation_matrix_vectorized(-MFA) # a nlx3x3 rotation matrix
+    
+    dsdt_Ref = np.zeros((3, len(MFA)))    
+    for i in range(len(MFA)):
+      # Perform multiplication for each layer
+      dsdt_Ref[:, i] = Contra_Rotate[i, :, :] @ dsdt[:, i]
+    
+    # then extract stress changes for the relevant layers
+    dsadt[0:iteration_count+1,0] = dsdt_Ref[0,:(iteration_count+1)] # anticlinal stress
+    dsldt[0:iteration_count+1,0] = dsdt_Ref[1,:(iteration_count+1)] # longitudinal stress
+    dtaudt[0:iteration_count+1,0] = dsdt_Ref[2,:(iteration_count+1)] # shear stress
+    
+    # sa_subset = sa[:(iteration_count+1)]
+    # plasticity = np.maximum(sa_subset-sig_Y_eff[0][:(iteration_count+1)],np.zeros((1,iteration_count+1)))
+    # plasticity = plasticity.reshape((iteration_count+1, 1))  # Reshape to have one column
+    # dsadt[0:iteration_count+1] = E_eff[:(iteration_count+1)]*(ERa - 1/p.mu*plasticity)
     #dsadt[0] = p.E*ERa-p.E/p.mu*max(sa[0]-p.sig_Y,0)
     
     # Gather the derivative vector dy/dt
     dy = np.append([dnsdt,dLdt],dsadt)
+    dy = np.append(dy,dsldt)
+    dy = np.append(dy,dtaudt)
     dy = np.append(dy,dWadt)
     
     # return the vector of time changes
@@ -134,11 +159,15 @@ print("Alpha=" + str(p.alpha))
 t = np.arange(p.t0,p.t_end+p.dt,p.dt) # time vector
 
 # Intial values
-sa0 = p.sig_a0*np.ones(p.nl) # all layers with the same initial stress
+sa0 = 1*np.ones(p.nl) # all layers with the same initial stress
+sl0 = np.zeros(p.nl) # initial longitudinal stress
+tau0 = np.zeros(p.nl) # initial tangential stress
 Wa0 = np.zeros(p.nl) # intialize all layers with zero thickness
 Wa0[0] = p.Wa0 # initial first layer
 y0 = [p.ns0,p.La] # initial values 
-y0 = np.append(y0,sa0) # combine
+y0 = np.append(y0, sa0) # combine
+y0 = np.append(y0, sl0) # combine
+y0 = np.append(y0, tau0) # combine
 y0 = np.append(y0,Wa0) # combine
 
 # Handle multilayer aproach

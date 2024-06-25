@@ -46,7 +46,7 @@ list_files = ['W_variable-khx1.pkl','W_variable-khx5.pkl','W_variable-khx10.pkl'
 # my_legend = ['1 l','40l','100l','200l']
 #list_files = ['Lockhart-khx1.pkl','Lockhart-khx10.pkl','Lockhart-khx100.pkl']
 #my_legend = ['Khx1','Khx2','Khx10']
-list_files = ['test_tancrede.pkl']
+list_files = ['test_fibrils.pkl']
 
 # list_files = ['complete-Cs_ext200-long.pkl','complete-Cs_ext200-n_constant.pkl','complete-Cs_ext200-PI_constant.pkl']
 # my_legend = ['Cs_ext=200','n=cste','PI=cste']
@@ -66,7 +66,7 @@ for i in range(size): # loop to open the files one by one and plot things
     p = data.p # get parameters
     t = data.t # get time vector
     tdepo = data.tdepo # get deposition time vector
-    Ldepo= data.Ldepo
+    Ldepo = data.Ldepo
     nt = len(t) # number of iterations
     my_legend[i] = f"{p.alpha:.2f}"
     
@@ -75,7 +75,9 @@ for i in range(size): # loop to open the files one by one and plot things
     ns = sol[:,0]
     La = sol[:,1]
     sa = sol[:,2:2+p.nl]
-    Wa = sol[:,2+p.nl:2+2*p.nl]
+    sl = sol[:,2+p.nl:2+2*p.nl] # extract longitudinal stress
+    tau = sol[:,2+2*p.nl:2+3*p.nl] # extract tangential stress
+    Wa = sol[:,2+3*p.nl:2+4*p.nl+1]
     
     # allocate some arrays for post processing
     sa_mean = np.zeros((nt,1)) 
