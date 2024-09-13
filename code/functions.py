@@ -15,11 +15,14 @@ class parameters:
         self.wall_regul = True
         
         # force no MF rotation
-        self.no_rotation = True
+        self.no_rotation = False
         
         # force a constant elongation rate
         self.force_elongation = True
-        self.G_forced = 3e-7
+        self.G_forced = 8e-7 #for meca prop computations
+        
+        # change deposition angle
+        self.change_deposition = False
         
         # force pressure steps
         self.pressure_steps = False
@@ -43,12 +46,15 @@ class parameters:
         
         # Time constant for viscous flow
         self.tau_visc = 5 * 3600
+        
+        # time constant for microtubules reorientation
+        self.tau_MT = 6*3600 
 
         # Yield deformation
         self.eps0 = 0.03
         
         # MFA angle
-        self.MFA0_deg = 10 # initial MFA angle in degrees
+        self.MFA0_deg = 5 # initial MFA angle in degrees
         self.MFA0 = self.MFA0_deg*np.pi/180
         
         # Hydraulic parameters
@@ -56,7 +62,7 @@ class parameters:
         self.Psi_src = 0 # (=P-PI)_{ext} : external (xylem) potential in Pa
         self.delta_PsiX = 0 # water source potential amplitude
         self.P_ext = 0 # external pressure  
-        self.Pi0 = 1e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
+        self.Pi0 = 0.8e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
         
         # Wall synthesis parameters [Friend et al, Nature com., 2022]
         self.omega = 2.2e-4 # normalised rate of mass growth (kg/m3/s) at T0
@@ -80,11 +86,11 @@ class parameters:
     
         # Simulation parameters
         self.t0 = 0
-        self.t_end = 2500*3600 # final time (s)
+        self.t_end = 1000*3600 # final time (s)
         self.dt = 0.1*3600 # time step at which data is saved (s) (not the actual time step)
         
         # Number of layers
-        self.nl = 1 # number of layers
+        self.nl = 80 # number of layers
         self.tfirstlayer = (self.t_end - self.t0)/self.nl
       
         # Physical constant
@@ -304,12 +310,13 @@ def compute_thresholds(coefs, angle, sa, sl, tau, plasticity):
 
         
 class data2save: # this creates a structure to save all datas
-    def __init__(self, p, t, sol,tdepo,Ldepo):
+    def __init__(self, p, t, sol,tdepo,Ldepo,theta_depo):
         self.p = p
         self.t = t
         self.sol = sol
         self.tdepo = tdepo
         self.Ldepo = Ldepo
+        self.theta_depo = theta_depo
         
 class data2write: # a structure to write some post processed data
     def __init__(self, name, parameter, sY, E, epsY, tau_visc):
@@ -319,6 +326,13 @@ class data2write: # a structure to write some post processed data
         self.E = E
         self.epsY = epsY
         self.tau_visc = tau_visc
+        
+class data2write_multi: # a structure to write some post processed data
+    def __init__(self, name, parameter, stress):
+        self.name = name
+        self.values = parameter
+        self.stress = stress
+
         
 def sort_files(files,pattern):
   """

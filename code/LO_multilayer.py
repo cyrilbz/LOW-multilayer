@@ -28,10 +28,10 @@ overwrite = True # True if you want to overwrite the existing file
 param_study = True # True if you want to run a parametric study 
 folder_path = "../runs/" # folder in which you want to write the results
 number_parameter = 2 # 1 or 2 - more is not implemented so far
-name_1 = 'MFA0_deg' # parameter name as listed in functions.py
-value_1 = np.arange(0,20,5) # parameter values
-name_2 = 'xi' # parameter name as listed in functions.py
-value_2 = [1,1.5,2] # parameter values
+name_1 = 'G_forced' # parameter name as listed in functions.py
+value_1 = [8e-7,10e-7] # parameter values
+name_2 = 'AR' # parameter name as listed exactly in functions.py
+value_2 = [10,100,1000,10000] # parameter values
 
 # handle simulation number and output files
 file_list = []
@@ -47,13 +47,13 @@ if param_study==True: ##### in case of parametric study ######
             combinations = list(itertools.product(value_1 , value_2))    
             print ("There are " +str(len(combinations))+" simulations to run.")
             for i in range(len(combinations)):
-                filename = name_1+'-'+f"{combinations[i][0]:.3f}"+'-'+name_2+'-'+f"{combinations[i][1]:.3f}"+'.pkl'
+                filename ='multi-' + name_1+'-'+f"{combinations[i][0]*10**7:.3f}"+'-'+name_2+'-'+f"{combinations[i][1]:.3f}"+'.pkl'
                 file_list.append(filename)
         case _: # all other values
             print("Param number not handled currently")
 else:           
     # Specify the output filename for a single simulation
-    filename ='test.pkl'
+    filename ='10l-G8e-7.pkl'
     file_list.append(filename)
     
 
@@ -65,7 +65,7 @@ def dydt(t,y,p): # all physical equations for time integration
     # and comment/uncomment the call to the solver below
     
     # get global variables - useful to handle the multilayer approach
-    global iteration_count, tdepo, Ldepo, t_pressure, k_pressure
+    global iteration_count, tdepo, Ldepo, t_pressure, k_pressure, theta_depo
     
     # extract data from y vector
     ns = y[0] # extract sugar content
@@ -73,8 +73,9 @@ def dydt(t,y,p): # all physical equations for time integration
     sa = y[2:2+p.nl] # extract anticlinal stress
     sl = y[2+p.nl:2+2*p.nl] # extract longitudinal stress
     tau = y[2+2*p.nl:2+3*p.nl] # extract longitudinal stress
-    Wa = y[2+3*p.nl:2+4*p.nl+1] # extract anticlinal wall thickness
-
+    Wa = y[2+3*p.nl:2+4*p.nl] # extract anticlinal wall thickness
+    theta_MT = y[-1] # extract microtubules angle
+    
     # Initialize time derivatives
     dnsdt = 0
     dLdt = 0
@@ -82,6 +83,7 @@ def dydt(t,y,p): # all physical equations for time integration
     dsldt = np.zeros((p.nl,1)) 
     dtaudt = np.zeros((p.nl,1)) 
     dWadt = np.zeros((p.nl,1))
+    dtheta_MTdt = 0
     
     # Initialize some other vectors
     eps_t = np.zeros((p.nl)) # total deformation
@@ -92,6 +94,7 @@ def dydt(t,y,p): # all physical equations for time integration
     if (tdepo[iteration_count]<t and iteration_count < len(tdepo)-1 and p.nl>1):
         iteration_count += 1 # switch to next layer
         Ldepo[iteration_count] = La # save deposition length
+        theta_depo[iteration_count] = theta_MT # save MT angle at deposition time
         
     # handle pressure forcing
     p_forcing = 0
@@ -118,14 +121,24 @@ def dydt(t,y,p): # all physical equations for time integration
     
     # Compute mean stresses and pressure
     sa_mean = np.dot(sa,Wa)/WaT # mean anticlinal stress
+    sl_mean = np.dot(sl,Wa)/WaT # mean longitudinal stress
+    tau_mean = np.dot(tau,Wa)/WaT # mean longitudinal stress
     P = 2*sa_mean*WaT/(p.Lp-2*WaT) + p.P_ext # pressure
+    
+    # Compute stress eigenvector direction
+    Rz = np.sqrt(((sa_mean-sl_mean)/2)**2+tau_mean**2) # Mohr circle center position
+    theta_p = np.pi/2-np.arctan(tau_mean/(Rz+(sa_mean-sl_mean)/2)) # Eigenvector direction
+    
+    # compute change in microtubules angle
+    if (p.change_deposition==True):
+        dtheta_MTdt = (theta_p - theta_MT)/p.tau_MT
     
     # Compute the total deformation and MFA related quantitites
     eps_t[:(iteration_count+1)] = (La - Ldepo[:(iteration_count+1)])/(Ldepo[:(iteration_count+1)]-2*WpT)    
     if (p.no_rotation==True): 
-        MFA = np.arctan(np.tan(p.MFA0_deg*np.pi/180)*np.exp(np.zeros((p.nl)))) # force no rotation
+        MFA = np.arctan(np.tan(theta_depo)*np.exp(np.zeros((p.nl)))) # force no rotation
     else: 
-        MFA = np.arctan(np.tan(p.MFA0_deg*np.pi/180)*np.exp(eps_t)) # MFA evolution
+        MFA = np.arctan(np.tan(theta_depo)*np.exp(eps_t)) # MFA evolution
 
     # Compute water fluxes
     my_psiX = p.Psi_src + 0.5*p.delta_PsiX*(1+np.cos((t/3600+12-0)*np.pi/12))
@@ -170,14 +183,13 @@ def dydt(t,y,p): # all physical equations for time integration
     # Compute Yield thresholds ( outputs a nlx3 matrix) and plastic components
     yields = compute_thresholds(p.radii, p.angle, s_rotated[0,:], s_rotated[1,:], s_rotated[2,:], plasticity)
     yields_tr = np.transpose(yields) # a 3xnl matrix
-    # p_a = plasticity*np.maximum(s_rotated[0,:]-yields_tr[0,:],np.zeros((p.nl)))
-    # p_l = plasticity*np.maximum(s_rotated[1,:]-yields_tr[1,:],np.zeros((p.nl)))
+    p_a = plasticity*np.maximum(s_rotated[0,:]-yields_tr[0,:],np.zeros((p.nl)))
+    p_l = plasticity*np.maximum(s_rotated[1,:]-yields_tr[1,:],np.zeros((p.nl)))
     # p_sh = plasticity*np.maximum(s_rotated[2,:]-yields_tr[2,:],np.zeros((p.nl)))
-    p_a = plasticity*(s_rotated[0,:]-yields_tr[0,:])
-    p_l = plasticity*(s_rotated[1,:]-yields_tr[1,:])
+    # p_a = plasticity*(s_rotated[0,:]-yields_tr[0,:])
+    # p_l = plasticity*(s_rotated[1,:]-yields_tr[1,:])
     p_sh = plasticity*(s_rotated[2,:]-yields_tr[2,:])
 
-    
     # Compute the changes in wall stresses in the MF frame
     dsdt = p.C_el @ eps_MF_tr - 1/p.tau_visc*np.vstack((p_a, p_l, p_sh)) # gives a 3xnl stress changes matrix
 
@@ -199,6 +211,7 @@ def dydt(t,y,p): # all physical equations for time integration
     dy = np.append(dy,dsldt)
     dy = np.append(dy,dtaudt)
     dy = np.append(dy,dWadt)
+    dy = np.append(dy,dtheta_MTdt)
     
     # return the vector of time changes
     return dy 
@@ -212,7 +225,7 @@ for sim in range(len(file_list)): # loop over all simulations
     if os.path.exists(path) and overwrite==False: # Check if the file already exists
         print("This output file already exists.") 
         continue
-    
+
     # get all parameters
     p = parameters() # get all parameters 
     
@@ -232,16 +245,22 @@ for sim in range(len(file_list)): # loop over all simulations
     tau0 = np.zeros(p.nl) # initial tangential stress
     Wa0 = np.zeros(p.nl) # intialize all layers with zero thickness
     Wa0[0] = p.Wa0 # initial first layer
+    # initial microtubules angle regarding the horizontal direction
+    theta_MT = p.MFA0_deg*np.pi/180 
+    
+    
     y0 = [p.ns0,p.La] # initial values 
     y0 = np.append(y0, sa0) # combine
     y0 = np.append(y0, sl0) # combine
     y0 = np.append(y0, tau0) # combine
     y0 = np.append(y0,Wa0) # combine
+    y0 = np.append(y0,theta_MT)
     
     # Handle multilayer aproach
     iteration_count = 0 # Initialize global variable
     tdepo = np.linspace(p.t0+p.tfirstlayer, p.t_end, p.nl, endpoint=True) # target time values for new layer creation
     Ldepo = np.zeros(p.nl) # vector to store all deposition length to compute total deformation
+    theta_depo = np.ones(p.nl)*(p.MFA0_deg*np.pi/180) # initial deposition angle
     Ldepo[0] = p.La # first layer already deposited
     yields_tr = np.zeros((3,p.nl))
     
@@ -257,9 +276,11 @@ for sim in range(len(file_list)): # loop over all simulations
     # sol = odeint(dydt, y0, t, args=(p,)) 
       #, atol = 1e-10 , rtol = 1e-6
     ######## Store solution #########
-    data = data2save(p,t,sol,tdepo,Ldepo) # create data structure
+    data = data2save(p,t,sol,tdepo,Ldepo,theta_depo) # create data structure
     with open(path, "wb") as file: # open file
         pickle.dump(data, file) # save data
+        
+    #print(theta_depo*180/np.pi)
     
     # Calculate the elapsed time.
     elapsed_time = time.time() - start_time

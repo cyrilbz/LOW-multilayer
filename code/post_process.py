@@ -12,6 +12,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy.integrate import odeint, solve_ivp
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
@@ -19,35 +20,43 @@ import pickle
 from functions import*
 
 
-
+myfigsize = [6.44,4]
 
 ################## change everything you need here #######################
 
 parametric_study = True # to launch post_process on a parametric study
+skip_plot = True # to skip the plots
+multilayer_study = True # to compute physical properties in multilayer case
 
 ############# No parametric study ################
 
 # you may list several filenames to compare between cases
 
-list_files =['MFA0_deg-0.000-Vf-0.050.pkl']
-#list_files = ['test.pkl']
+list_files =['test-monolayer.pkl','test-multilayer.pkl','test-multilayer-80.pkl']
+list_files = ['test-fully_coupled-10l.pkl']
+list_files = ['MFA0_deg-45.000-Em-1000000.000.pkl']
+# list_files = ['test5deg-no_fish.pkl']
+#list_files = ['test-rotation_only-80l.pkl']
+list_files = ['10l-G8e-7.pkl','30l-G8e-7.pkl','50l-G8e-7.pkl','80l-G8e-7.pkl','120l-G8e-7.pkl','180l-G8e-7.pkl','260l-G8e-7.pkl']
+list_files = ['80l-G8e-7.pkl']
 # my_legend = ['1 layer','40 layers','80 layers','120 layers']
-my_legend = ['no Poisson','Poisson','60','90']
+my_legend = ['80','120','180','260']
 # my_legend = ['30deg ','60','90deg']
 legend_title = r"$MFA_0 (\circ)$"
+legend_title = r"$n_l$"
 
 #############  Parametric_study ################
 
-skip_plot = True # to skip the plots
 save_data_parametric = True # to save some parametric study results (!! CHANGE THE FILE NAME BELOW !!)
 read_data_file = False # to open some additional data to get computed mechanical constants
 
-parameter_name = ['MFA0_deg','xi']  # list of parameters to save along with the results
+parameter_name = ['G_forced','eps0']  # list of parameters to save along with the results
 # filename pattern for parametric study
-pattern = r"MFA0_deg-([-\d.]+)-xi-([-\d.]+).pkl"  
+pattern = r"multi-G_forced-([-\d.]+)-eps0-([-\d.]+).pkl"  
 folder = "../runs/"
 
-data_file = "data-test_parametric.pkl" # data file to write
+data_file = "multi-effect_eps0.pkl" # data file to write
+
 data2open = ["data_effect_MFA-lowdt.pkl"] # data file to open
 
 ################## nothing to change below #######################
@@ -63,13 +72,20 @@ if parametric_study==True:
 my_color = ['blue','red','orange','green','magenta'] # list color for plots
 size = len(list_files) # get the number of files
 
+print ("There are " +str(size)+" simulations to analyse.")
+
 # initialize data to be saved
 sY = np.zeros((size))
 E = np.zeros((size))
 epsY = np.zeros((size))
 tau_visc_save = np.zeros((size))
 param2save = np.zeros((size,len(parameter_name)))
+if multilayer_study==True:
+    sigma_saved = np.zeros((size))
 
+fig= plt.figure(12,figsize=myfigsize)
+ax = fig.add_axes([0,0,1,1])
+axins = fig.add_axes([0.635,0.3,0.3,0.3])  # Location of the inset
 
 for i in range(size): # loop to open the files one by one and plot things
     print("Simulation running: " + str(list_files[i]))
@@ -83,6 +99,10 @@ for i in range(size): # loop to open the files one by one and plot things
     t = data.t # get time vector
     tdepo = data.tdepo # get deposition time vector
     Ldepo = data.Ldepo
+    if hasattr(data, 'theta_depo'):
+        theta_depo = data.theta_depo
+    else:
+        theta_depo = p.MFA0_deg*np.pi/180 # MFA at deposition
     nt = len(t) # number of iterations
     #my_legend[i] = f"{p.MFA0_deg:.2f}"
 
@@ -93,7 +113,8 @@ for i in range(size): # loop to open the files one by one and plot things
     sa = sol[:,2:2+p.nl]
     sl = sol[:,2+p.nl:2+2*p.nl] # extract longitudinal stress
     tau = sol[:,2+2*p.nl:2+3*p.nl] # extract tangential stress
-    Wa = sol[:,2+3*p.nl:2+4*p.nl+1]
+    Wa = sol[:,2+3*p.nl:2+4*p.nl]
+    theta_MT = sol[:,-1]
     
     # allocate some arrays for post processing
     sa_mean = np.zeros((nt,1)) 
@@ -124,6 +145,7 @@ for i in range(size): # loop to open the files one by one and plot things
     Vh = La*p.Lp*p.Lz - VwpT- VwaT
     Cs = ns/Vh
     PI = Cs*p.Rg*p.T
+    theta_MT = theta_MT*180/np.pi
         
     # Compute areas
     Cell_area = La*p.Lp
@@ -167,123 +189,127 @@ for i in range(size): # loop to open the files one by one and plot things
             
     eps_t = np.transpose(eps_t) # transpose the matrix to be consistent with other matrix      
     phi0 = p.MFA0_deg*np.pi/180 # MFA at deposition
-    MFA = np.arctan(np.tan(phi0)*np.exp(eps_t)) # micro-fibril angle evolution
+    MFA = np.arctan(np.tan(theta_depo)*np.exp(eps_t)) # micro-fibril angle evolution
     if (hasattr(p, "no_rotation") and p.no_rotation==True): 
-        MFA = np.arctan(np.tan(phi0)*np.exp(np.zeros((nt,p.nl)))) # no rotation case
+        MFA = np.arctan(np.tan(theta_depo)*np.exp(np.zeros((nt,p.nl)))) # no rotation case
  
     # # Compute eigenvectors
     # # First, based on local layer values
     # Rz = np.sqrt(((sa-sl)/2)**2+tau**2)
     # phi1 = np.arctan(tau/(Rz+(sa-sl)/2))*180/np.pi
     
-    # # then based on averaged value
-    # Rz_mean = np.sqrt(((sa_mean-sl_mean)/2)**2+tau_mean**2)
-    # phi1_mean = np.arctan(tau_mean/(Rz_mean+(sa_mean-sl_mean)/2))*180/np.pi
+    # then based on averaged value
+    Rz_mean = np.sqrt(((sa_mean-sl_mean)/2)**2+tau_mean**2)
+    phi1_mean = 90 - np.arctan(tau_mean/(Rz_mean+(sa_mean-sl_mean)/2))*180/np.pi
     
     ###############################################
-    ########## Find where Tsai-Hill got activated #######
-    found_yield=False
-    for k in range(nt):
-        rotation = rotation_matrix_stress(np.pi/2-MFA[k,:]) #rotation matrix to get stress in the MF frame
-        Contra_rotate = rotation_matrix_stress(MFA[k,:] - np.pi/2)
-        s_rotated = np.zeros((3, len(MFA[k,:])))    
-        for m in range(len(MFA[k,:])):
-            # Perform multiplication for each layer -> IT IS NOT VECTORIZED !!! =(
-            s_rotated [:, m] = rotation[m, :, :]  @ np.array((sa[k,m],sl[k,m],tau[k,m]))
-            # compute Tsai-Hill criterion
-            Tsai[:,k]= (s_rotated[0,:]/p.Y1)**2 - (s_rotated[0,:]*s_rotated[1,:])/(p.Y1**2) + (s_rotated[1,:]/p.Y2)**2 + (s_rotated[2,:]/p.Y12)**2
-            plasticity = (Tsai[:,k]>1) # True if the wall layer is in plasticity
-            buffer = compute_thresholds(p.radii, p.angle, s_rotated[0,:], s_rotated[1,:], s_rotated[2,:], plasticity)         
-            yields_rotated[:,:,k] = Contra_rotate[m, :, :]  @ np.transpose(buffer)
-            if plasticity==True:
-              if found_yield==False:
-                  first_yield = yields_rotated[0,0,k] # save apparent yield stress
-                  print(' ---- Plasticity starts at  ----')
-                  print(f"{yields_rotated[0,0,k]/1e6} MPa")
-                  found_yield=True   
-    if found_yield==False:
-        print("!!! Yield not found !!!")
-    # at convergence, the yields is the last computed value
-    sY[i] = yields_rotated[0,0,-1] # here it is for the first layer
-    print(' ---- Actual yield is ----')
-    print(f"sigma_Y ={sY[i]/1e6} MPa")
-      
-    ############ Compute the elastic modulus of the first layer ########
-    if read_data_file==False:
-        mask = sa_mean<=0.1*first_yield # isolate stresses below yield
-        y = sa_mean[mask]    
-        x = eps_t[mask[:,0],0]
-        #if len(y)<2:
-        # apply a linear regression model
-        m_x = np.mean(x)
-        m_y = np.mean(y)
-        E_stat = np.sum((x-m_x)*(y-m_y))/np.sum((x-m_x)**2)
-        # basic method
-        E_basic= y[-1]/x[-1] # just use endpoints
-        # more advanced linear regression
-        from sklearn.linear_model import LinearRegression
-        model = LinearRegression(fit_intercept=False).fit(x.reshape((-1, 1)), y)
-        E_skl = model.coef_
-        epsY[i] = sY[i]/E_skl[0]
-        print(' ---- Computed Young modulus ----')
-        print(f"E_basic ={E_basic/1e6} MPa")
-        print(f"E_skl = {E_skl/1e6} MPa")
-        print(f"E_stat = {E_stat/1e6} MPa")
-        E[i] = E_skl[0]
-        print(f"eps_Y is = {epsY[i]}")
-        
-        
-        ############ save the previous data
-        if parametric_study==True and save_data_parametric==True:
-            for z in range(len(parameter_name)):
-                param2save[i,z] = getattr(p, parameter_name[z])
-        
-
-    if read_data_file==True: # read some data file
-        size = len(data2open)
-        print("Data file opened: " + str(data2open))
-        path = "../runs/" + data2open[0]
-        with open(path, "rb") as file:
-            data = pickle.load(file)
+    if p.nl==1:
+        ########## Find where Tsai-Hill got activated #######
+        found_yield=False
+        for k in range(nt):
+            rotation = rotation_matrix_stress(np.pi/2-MFA[k,:]) #rotation matrix to get stress in the MF frame
+            Contra_rotate = rotation_matrix_stress(MFA[k,:] - np.pi/2)
+            s_rotated = np.zeros((3, len(MFA[k,:])))    
+            for m in range(len(MFA[k,:])):
+                # Perform multiplication for each layer -> IT IS NOT VECTORIZED !!! =(
+                s_rotated [:, m] = rotation[m, :, :]  @ np.array((sa[k,m],sl[k,m],tau[k,m]))
+                # compute Tsai-Hill criterion
+                Tsai[:,k]= (s_rotated[0,:]/p.Y1)**2 - (s_rotated[0,:]*s_rotated[1,:])/(p.Y1**2) + (s_rotated[1,:]/p.Y2)**2 + (s_rotated[2,:]/p.Y12)**2
+                plasticity = (Tsai[:,k]>1) # True if the wall layer is in plasticity
+                buffer = compute_thresholds(p.radii, p.angle, s_rotated[0,:], s_rotated[1,:], s_rotated[2,:], plasticity)         
+                yields_rotated[:,:,k] = Contra_rotate[m, :, :]  @ np.transpose(buffer)
+                if plasticity[0]==True:
+                  if found_yield==False:
+                      first_yield = yields_rotated[0,0,k] # save apparent yield stress
+                      print(' ---- Plasticity starts at  ----')
+                      print(f"{yields_rotated[0,0,k]/1e6} MPa")
+                      found_yield=True   
+        if found_yield==False:
+            print("!!! Yield not found !!!")
+        # at convergence, the yields is the last computed value
+        sY[i] = yields_rotated[0,0,-1] # here it is for the first layer
+        print(' ---- Actual yield is ----')
+        print(f"sigma_Y ={sY[i]/1e6} MPa")
+          
+        ############ Compute the elastic modulus of the first layer ########
+        if read_data_file==False:
+            mask = sa_mean<=0.1*first_yield # isolate stresses below yield    
+            y = sa_mean[mask]    
+            x = eps_t[mask[:,0],0]
+            # if not y:
+            #     y = sa_mean[0:2]   
+            #     x = eps_t[0:2,0]
+            #if len(y)<2:
+            # apply a linear regression model
+            m_x = np.mean(x)
+            m_y = np.mean(y)
+            E_stat = np.sum((x-m_x)*(y-m_y))/np.sum((x-m_x)**2)
+            # basic method
+            E_basic= y[-1]/x[-1] # just use endpoints
+            # more advanced linear regression
+            from sklearn.linear_model import LinearRegression
+            model = LinearRegression(fit_intercept=False).fit(x.reshape((-1, 1)), y)
+            E_skl = model.coef_
+            epsY[i] = sY[i]/E_skl[0]
+            print(' ---- Computed Young modulus ----')
+            print(f"E_basic ={E_basic/1e6} MPa")
+            print(f"E_skl = {E_skl/1e6} MPa")
+            print(f"E_stat = {E_stat/1e6} MPa")
+            E[i] = E_skl[0]
+            print(f"eps_Y is = {epsY[i]}")
             
-        param = data.values
-        my_E = data.E
-        my_sY = data.sY 
-        # find the correct angle
-        indices = np.where(param == p.MFA0_deg)[0]
-        # sY[i] = my_sY[indices][0]
-        E[i] = my_E[indices][0]
-        print(f"Angle is ={p.MFA0_deg} deg")
-        print(f"E is ={E[i]/1e6} MPa")
-        print(f"sY is ={sY[i]/1e6} MPa")
-        
-        
-    ######## compute the viscous time constant
-    dsadt = np.diff(sa_mean[:,0])/p.dt
-    dsadt = np.concatenate(([0], dsadt))
-    tau_visc = np.zeros((nt))
-    for k in range(nt):
-        #tau_visc[k] = (sa_mean[k]-sY[i])/(E[i]*G[k] - dsadt[k]+1e-10)/3600 # viscous time constant in h
-        #tau_visc[k] = (sa_mean[k,0]-sY[i])/(E[i]*G[k,0] +1e-14)/3600 
-        tau_visc[k] = (sa_mean[k,0]-yields_rotated[0,0,k])/(E[i]*G[k,0] +1e-14)/3600 
-
-
-    tau_visc_save[i] = tau_visc[-1] # save viscous time constant at convergence
-    print(' ---- Computed viscous time constant ----')
-    print(f"Viscous time is = {tau_visc_save[i]} [h]")
-    # # Compute the theoretical (Lockhart like) solution
-    # def lockhart_cambium(y,t,p):
-    #     Lth = y # cell length
-    #     PM = p.Psi_src + p.Pi0 # motor power
-    #     Py0 = p.sig_Y*2*p.Wa0/(p.Lp-2*p.Wa0) # yield pressure
-    #     phi_w = 1/p.mu*(p.Lp-2*p.Wa0)/(2*p.Wa0)
-    #     phi_a = 2*(Lth + p.Lp)/((Lth-2*p.Wp0)*(p.Lp-2*p.Wa0))*p.kh
-    #     alpha = phi_a/(phi_a+phi_w)
-    #     dydt = (Lth-2*p.Wp0)*alpha*phi_w*(PM-Py0)
-    #     return dydt 
+            
+            ############ save the previous data
+            if parametric_study==True and save_data_parametric==True:
+                for z in range(len(parameter_name)):
+                    param2save[i,z] = getattr(p, parameter_name[z])
+            
     
-    # lock = odeint(lockhart_cambium, p.La, t, args=(p,))
+        if read_data_file==True: # read some data file
+            size = len(data2open)
+            print("Data file opened: " + str(data2open))
+            path = "../runs/" + data2open[0]
+            with open(path, "rb") as file:
+                data = pickle.load(file)
+                
+            param = data.values
+            my_E = data.E
+            my_sY = data.sY 
+            # find the correct angle
+            indices = np.where(param == p.MFA0_deg)[0]
+            # sY[i] = my_sY[indices][0]
+            E[i] = my_E[indices][0]
+            print(f"Angle is ={p.MFA0_deg} deg")
+            print(f"E is ={E[i]/1e6} MPa")
+            print(f"sY is ={sY[i]/1e6} MPa")
+            
+            
+        ######## compute the viscous time constant
+        dsadt = np.diff(sa_mean[:,0])/p.dt
+        dsadt = np.concatenate(([0], dsadt))
+        tau_visc = np.zeros((nt))
+        for k in range(nt):
+            #tau_visc[k] = (sa_mean[k]-sY[i])/(E[i]*G[k] - dsadt[k]+1e-10)/3600 # viscous time constant in h
+            #tau_visc[k] = (sa_mean[k,0]-sY[i])/(E[i]*G[k,0] +1e-14)/3600 
+            tau_visc[k] = (sa_mean[k,0]-yields_rotated[0,0,k])/(E[i]*G[k,0] +1e-14)/3600 
     
+    
+        tau_visc_save[i] = tau_visc[-1] # save viscous time constant at convergence
+        print(' ---- Computed viscous time constant ----')
+        print(f"Viscous time is = {tau_visc_save[i]} [h]")
+        # # Compute the theoretical (Lockhart like) solution
+        # def lockhart_cambium(y,t,p):
+        #     Lth = y # cell length
+        #     PM = p.Psi_src + p.Pi0 # motor power
+        #     Py0 = p.sig_Y*2*p.Wa0/(p.Lp-2*p.Wa0) # yield pressure
+        #     phi_w = 1/p.mu*(p.Lp-2*p.Wa0)/(2*p.Wa0)
+        #     phi_a = 2*(Lth + p.Lp)/((Lth-2*p.Wp0)*(p.Lp-2*p.Wa0))*p.kh
+        #     alpha = phi_a/(phi_a+phi_w)
+        #     dydt = (Lth-2*p.Wp0)*alpha*phi_w*(PM-Py0)
+        #     return dydt 
+        
+        # lock = odeint(lockhart_cambium, p.La, t, args=(p,))
+        
     #################
     # Compute pressure and growth rate using (adapted) Lockhart solution
     PM = p.Psi_src + p.Pi0 # motor power
@@ -296,11 +322,18 @@ for i in range(size): # loop to open the files one by one and plot things
     # P_lock = alpha*PM + (1-alpha)*Py0 + p.omega/p.rho_w/(phi_a+phi_w)*1/(1+p.Rg*p.T*p.Km/PI)# synthesis case
     G_lock = alpha*phi_w*(PM-Py0) #+ p.omega/p.rho_w*alpha*1/(1+p.Rg*p.T*p.Km/PI)
     
+    ############## save final mean anticlinal stress ##############
+    if multilayer_study==True:
+        sigma_saved[i] = sa_mean[-1,0] # save final stress
+        print(f"Final stress is {sigma_saved[i]/1e6} [MPa]")
+        for z in range(len(parameter_name)):
+            param2save[i,z] = getattr(p, parameter_name[z])
+    
     
     ########## Skip plots if you want
     if skip_plot==True: continue
     ######### Plots ##########
-    plt.figure(1)
+    plt.figure(1,figsize=myfigsize)
     plt.plot(th,(La)*1000000,label=my_legend[i])
     # plt.plot([150, 150], [0, 84],':b',linewidth=1.5)
     # plt.plot([90, 90], [0, 42],color='orange',linewidth=1.5,linestyle=':')
@@ -318,25 +351,42 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    # plt.figure(2)
-    # plt.plot(th,sa_mean/1e6,label=my_legend[i],color=my_color[i])
-    # plt.legend(loc='best',title=r"$MFA_0$")
-    # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
-    # # plt.ylim((1,1.5))
-    # # plt.xlim((20,60))
+
+    ax.plot(th,sa_mean/1e6,label=my_legend[i])
+    ax.legend(loc='best',title=legend_title)
+    #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
+    # plt.ylim((1,1.5))
+    # plt.xlim((20,60))
+    ax.set_xlabel(r"\textbf{t [h]}", fontsize=16)
+    ax.set_ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
     # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     # plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
-    # plt.title(r"$\textbf{Mean anticlinal wall stress}$", fontsize=16)
+    ax.set_title(r"$\textbf{Mean anticlinal wall stress}$", fontsize=16)
     # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    ax.minorticks_on()
     # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    ax.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    ax.indicate_inset([800,2.6,200,0.2],axins, edgecolor="blue")
     # plt.tight_layout()
+    # plt.show()
     
-    plt.figure(2)
+    # Create the inset plot
+    axins.plot(th,sa_mean/1e6,label=my_legend[i])
+    axins.set_xlim(800, 1000)  # Adjust x-axis limits for the inset
+    axins.set_ylim(2.6, 2.8)  # Adjust y-axis limits for the inset
+    ax.indicate_inset_zoom(axins, edgecolor="blue")
+    # Plot data in the inset
+    #axins.plot(th,sa_mean/1e6)
+    #axins.plot(x, y2, label='cos(x)')
+    # axins.set_xlim(800, 1000)  # Adjust x-axis limits for the inset
+    # axins.set_ylim(2.5, 2.7)  # Adjust y-axis limits for the inset
+
+    
+    plt.figure(2,figsize=myfigsize)
     plt.plot(th,sa/1e6,label=my_legend[i])
-    plt.legend(loc='best',title=legend_title)
+    if p.nl==1:
+        plt.legend(loc='best',title=legend_title)
     #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
     # plt.ylim((1,1.5))
     # plt.xlim((20,60))
@@ -367,22 +417,24 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     # plt.tight_layout()
     
-    plt.figure(18)
-    plt.plot(th,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
-    # plt.plot(sa/1e6,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
-    plt.legend(loc='best',title=legend_title)
-    plt.plot([0, th[-1]], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=1.5)
-    # plt.ylim((1,1.5))
-    # plt.xlim((20,60))
-    plt.xlabel(r"\textbf{${t_h}$ [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{${\sigma_Y^{a}}$ [MPa]}", fontsize=16)
-    plt.title(r"$\textbf{Yield stress in the global frame}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
+    if p.nl==1:
+        plt.figure(18,figsize=myfigsize)
+        plt.plot(th,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
+        # plt.plot(sa/1e6,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
+        plt.legend(loc='best',title=legend_title)
+    
+        plt.plot([0, th[-1]], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=1.5)
+        # plt.ylim((1,1.5))
+        # plt.xlim((20,60))
+        plt.xlabel(r"\textbf{${t_h}$ [h]}", fontsize=16)
+        plt.ylabel(r"\textbf{${\sigma_Y^{a}}$ [MPa]}", fontsize=16)
+        plt.title(r"$\textbf{Yield stress in the global frame}$", fontsize=16)
+        # Set grid and minor ticks
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+        plt.minorticks_on()
+        # Use LaTeX for tick labels (optional)
+        plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+        plt.tight_layout()
     
     # plt.figure(18)
     # plt.plot(th,yields[1,0,:]/1e6,label=my_legend[i])
@@ -400,9 +452,10 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     # plt.tight_layout()
     
-    plt.figure(14)
+    plt.figure(14,figsize=myfigsize)
     plt.plot(th,sl/1e6,label=my_legend[i])
-    plt.legend(loc='best',title=legend_title)
+    if p.nl==1:
+        plt.legend(loc='best',title=legend_title)
     #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
     # plt.ylim((1,1.5))
     # plt.xlim((20,60))
@@ -416,14 +469,15 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    plt.figure(15)
+    plt.figure(15,figsize=myfigsize)
     plt.plot(th,tau/1e6,label=my_legend[i])
     # phi2 = np.arctan(tau/(-Rz+(sl-sa)/2))*180/np.pi
     # plt.plot(th,90-phi1,label=my_legend[i],marker='o',linestyle='none')
     # plt.plot(th,90-phi1_mean,color='black',linestyle='--')
     # plt.plot(th,phi1-90+MFA*180/np.pi,label=my_legend[i],linestyle='--')
     # plt.plot(th,lam2,label=my_legend[i],linestyle='--')
-    plt.legend(loc='best',title=legend_title)
+    if p.nl==1:
+        plt.legend(loc='best',title=legend_title)
     #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
     # plt.ylim((1,1.5))
     # plt.xlim((20,60))
@@ -437,7 +491,7 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    plt.figure(16)
+    plt.figure(16,figsize=myfigsize)
     plt.plot(th,Tsai[0,:],label=my_legend[i])
     # phi2 = np.arctan(tau/(-Rz+(sl-sa)/2))*180/np.pi
     # plt.plot(th,90-phi1,label=my_legend[i],marker='o',linestyle='none')
@@ -458,10 +512,10 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
         
-    plt.figure(3)
+    plt.figure(3,figsize=myfigsize)
     plt.plot(th,P/1e6,label=my_legend[i])    
     plt.plot([0, p.t_end/3600], [PM/1e6, PM/1e6],':k',linewidth=1.5)
-    plt.plot(th,P_lock/1e6,marker='v', markevery=8, linestyle='',color=my_color[i])
+    #plt.plot(th,P_lock/1e6,marker='v', markevery=8, linestyle='',color=my_color[i])
     plt.legend(loc='best',title=legend_title)
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
     plt.ylabel(r"\textbf{$P$ [MPa]}", fontsize=16)
@@ -473,7 +527,7 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    plt.figure(4)
+    plt.figure(4,figsize=myfigsize)
     
     plt.plot(th,WaT*1000000,label=my_legend[i])
     plt.legend(loc='best',title=legend_title)
@@ -495,19 +549,22 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.xlabel('t [h]')
     # plt.ylabel('PI [MPa]')
     
-    plt.figure(6)
+    plt.figure(6,figsize=myfigsize)
     # plt.scatter(eps_t[:,0]*100,sa_mean/1e6,c=th,cmap='viridis')
     # plt.colorbar(label='Time [h]')
-    plt.plot(eps_t[:,0]*100,sa_mean/1e6,label=my_legend[i])
-    plt.plot([eps_t[0,0]*100, eps_t[-1,0]*100], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=1.5)
-    plt.plot(eps_t[:,0]*100,eps_t[:,0]*E[i]/1e6,'orange',linestyle='--')
+    plt.plot(eps_t[:,0]*100,sa_mean/1e6,label=my_legend[i],marker='+')
+    if p.nl==1:
+        plt.plot([eps_t[0,0]*100, eps_t[-1,0]*100], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=1.5)
+        plt.plot(eps_t[:,0]*100,eps_t[:,0]*E[i]/1e6,'orange',linestyle='--')
+        plt.legend(loc='best',title=legend_title)
+        text_str = f"$\sigma_Y$ : {sY[0]/1e6:.2f} MPa ; E = {E[i]/1e6:.2f} MPa"
+        plt.text(0.455*eps_t[-1,0]*100,0.35*sa_mean[-1]/1e6,text_str, fontsize=14)
     plt.ylim((0,np.max(sa_mean/1e6)))
-    plt.legend(loc='best',title=legend_title)
     plt.xlabel(r"\textbf{$\varepsilon^T$ $[\%]$}", fontsize=16)
     plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
     plt.title(r"$\textbf{Stress-deformation curve for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
-    text_str = f"$\sigma_Y$ : {sY[0]/1e6:.2f} MPa ; E = {E[i]/1e6:.2f} MPa"
-    plt.text(0.455*eps_t[-1,0]*100,0.35*sa_mean[-1]/1e6,text_str, fontsize=14)
+    
+
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.minorticks_on()
@@ -516,21 +573,19 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tight_layout()
     
     
-    # plt.figure(7)
-    # plt.plot(eps_t[:,0]*100,Tsai[0,:])
-
-    # # plt.xscale('log')
-    # # plt.plot([0, p.t_end/3600], [sY/1e6, sY/1e6],':k',linewidth=1.5)
-    # # # plt.ylim((0,1.1))
-    # plt.xlabel(r"\textbf{$\varepsilon^T$ $[\%]$}", fontsize=16)
-    # plt.ylabel(r"\textbf{Tsai-Hill []}", fontsize=16)
-    # # plt.title(r"$\textbf{stress-defo}$", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
+    plt.figure(7,figsize=myfigsize)
+    plt.plot(th,theta_MT,label = 'MT angle')
+    plt.plot(th,phi1_mean,'--',label = 'Principal stress angle')
+    plt.legend(loc='best')
+    plt.xlabel(r"\textbf{$t_h$ $[h]$}", fontsize=16)
+    plt.ylabel(r"\textbf{$\theta$ [$\circ$]}", fontsize=16)
+    # plt.title(r"$\textbf{stress-defo}$", fontsize=16)
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
     
     
     # plt.plot(th,sa_mean/1e6,label=my_legend[i],color=my_color[i])
@@ -598,7 +653,7 @@ for i in range(size): # loop to open the files one by one and plot things
         
 
     
-    plt.figure(10)
+    plt.figure(10,figsize=myfigsize)
     plt.plot(th,G*3600,label=my_legend[i])
     # plt.ylim((0,1.1))
     plt.legend(loc='best',title=legend_title)
@@ -627,11 +682,11 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.tight_layout()
     
     # plt.figure(12)
-    # plt.plot(th,MFA*180/np.pi)
+    # plt.plot(W_sum[-1,:]*1e6,MFA[-1,:]*180/np.pi)
     # # plt.ylim((0,1.1))
-    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # plt.xlabel(r"\textbf{W [µm]}", fontsize=16)
     # plt.ylabel(r"\textbf{MFA in degrees}", fontsize=16)
-    # plt.title(r"$\textbf{MFA changes for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
+    # plt.title(r"$\textbf{MFA final distribution for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
     # # Set grid and minor ticks
     # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     # plt.minorticks_on()
@@ -652,38 +707,38 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     # plt.tight_layout()
     
+    if p.nl==1:
+        plt.figure(17,figsize=myfigsize)
+        # plt.plot(G*3600,sa_mean,label=my_legend[i],color=my_color[i])
+        # plt.scatter((sa_mean-sY[i])/1e6,G*3600,c=th,cmap='viridis')
+        #mask = sa_mean>sY[i]
+        plt.plot(th,tau_visc,label=my_legend[i])
+        plt.plot([th[0],th[-1]],[5, 5],':k',linewidth=1.5)
+        # plt.xlim([150,400])
+        plt.ylim([0,10])
+        # plt.plot(th,G_lock*3600,marker='v', markevery=8, linestyle='',color=my_color[i])
+        # plt.ylim((0,1.1))
+        # plt.yscale('log')
+        plt.legend(loc='best',title=legend_title)
+        plt.xlabel(r"\textbf{$t_h$ [h]}", fontsize=16)
+        plt.ylabel(r"\textbf{$\tau_{visq}$ [h]}", fontsize=16)
+        plt.title(r"$\textbf{Viscous time}$", fontsize=16)
+        # Set grid and minor ticks
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+        plt.minorticks_on()
+        # Use LaTeX for tick labels (optional)
+        plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+        plt.tight_layout()
     
-    plt.figure(17)
-    # plt.plot(G*3600,sa_mean,label=my_legend[i],color=my_color[i])
-    # plt.scatter((sa_mean-sY[i])/1e6,G*3600,c=th,cmap='viridis')
-    #mask = sa_mean>sY[i]
-    plt.plot(th,tau_visc,label=my_legend[i])
-    plt.plot([th[0],th[-1]],[5, 5],':k',linewidth=1.5)
-    # plt.xlim([150,400])
-    plt.ylim([0,10])
-    # plt.plot(th,G_lock*3600,marker='v', markevery=8, linestyle='',color=my_color[i])
-    # plt.ylim((0,1.1))
-    # plt.yscale('log')
-    plt.legend(loc='best',title=legend_title)
-    plt.xlabel(r"\textbf{$t_h$ [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{$\tau_{visq}$ [h]}", fontsize=16)
-    plt.title(r"$\textbf{Viscous time}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
     
-    
-    plt.figure(9)
+    plt.figure(9,figsize=myfigsize)
     fig, ax = plt.subplots()
     # Spatio-temporal stress profile
     # Define your desired colormap (e.g., 'viridis')
     cmap = plt.cm.viridis
     
     # Select equally distributed timesteps (adjust divisor for different numbers)
-    selected_timesteps = np.linspace(10, nt-1, 5, dtype=int)  # Use np.linspace for even distribution
+    selected_timesteps = np.linspace(10, nt-1, 16, dtype=int)  # Use np.linspace for even distribution
     
     # Create a color mapper object for the selected timesteps
     norm = plt.Normalize(vmin=th[selected_timesteps[0]], vmax=th[selected_timesteps[-1]])
@@ -732,12 +787,77 @@ for i in range(size): # loop to open the files one by one and plot things
     dpi = 300  # Dots per inch
     # Save the figure as a high-resolution JPEG
     #plt.savefig("stress_profiles-W_cste.jpeg", dpi=dpi)
+    
+    
+       
+    plt.figure(13,figsize=myfigsize)
+    fig, ax = plt.subplots()
+    # Spatio-temporal stress profile
+    # Define your desired colormap (e.g., 'viridis')
+    cmap = plt.cm.viridis
+    
+    # Select equally distributed timesteps (adjust divisor for different numbers)
+    selected_timesteps = np.linspace(10, nt-1, 16, dtype=int)  # Use np.linspace for even distribution
+    
+    # Create a color mapper object for the selected timesteps
+    norm = plt.Normalize(vmin=th[selected_timesteps[0]], vmax=th[selected_timesteps[-1]])
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    
+    # Plot loop for each timestep
+    for k,timestep in enumerate(selected_timesteps):
+        # Get color based on timestep
+        color = sm.to_rgba(th[timestep])
+        
+        # Get data points where wa is not zero (boolean mask)
+        mask = Wa[timestep] != 0
+        
+        # Filter W_sum and sa based on the mask
+        W_sum_f = W_sum[timestep][mask]
+        MFA_f = MFA[timestep][mask]
+                
+        # # Local average for non-edge elements (vectorized)
+        # W_sum_f[1:-1] = (W_sum_f[:-2] + W_sum_f[2:]) / 2
+        
+        # # plot at mean layer thickness values
+        # if len(W_sum_f) > 1:  # Check for at least two elements
+        #     W_sum_f[0] = (W_sum_f[0]) / 2  # Average first element
+        #     W_sum_f[-1] = (W_sum_f[-1] + W_sum_f[-2]) / 2  # Average last element
+        # else:
+        #     W_sum_f[0] = (W_sum_f[0]) / 2 
+
+        # Plot with color from colormap
+        ax.plot(W_sum_f*1e6, MFA_f*180/np.pi, color=color, label=f'Time: {th[timestep]}',marker='.')
+        
+    # Add colorbar
+    fig.colorbar(sm, label='Time [h]', ax=ax)  # Add colorbar to the axes    
+    #plt.plot(W_sum[-1]*1e6,sa[-1]/1e6,color=my_color[i])
+    # plt.ylim((0,1.1))
+    #plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, np.max(np.max(sa, axis=1))/1e6],':k',linewidth=1.5)
+    plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
+    plt.ylabel(r"\textbf{MFA [$\circ$]}", fontsize=16)
+    plt.title(r"$\textbf{MFA profiles}$", fontsize=16)
+    #plt.legend(loc='best')
+    # Set grid and minor ticks
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.minorticks_on()
+    # Use LaTeX for tick labels (optional)
+    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    plt.tight_layout()
+    dpi = 300  # Dots per inch
+    # Save the figure as a high-resolution JPEG
+    #plt.savefig("stress_profiles-W_cste.jpeg", dpi=dpi)
 
 ## write some data in a .txt file    
-if parametric_study==True and save_data_parametric==True:
+if parametric_study==True and save_data_parametric==True and multilayer_study==False:
     buff = data2write(parameter_name, param2save, sY, E, epsY, tau_visc_save)
     with open("../runs/" + data_file, 'wb') as file:
         pickle.dump(buff, file) # save data
-    
-    
+        
+## write some data in a .txt file    
+if parametric_study==True and save_data_parametric==True and multilayer_study==True:
+    buff = data2write_multi(parameter_name, param2save, sigma_saved)
+    with open("../runs/" + data_file, 'wb') as file:
+        pickle.dump(buff, file) # save data
+  
+
     
