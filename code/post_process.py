@@ -20,13 +20,13 @@ import pickle
 from functions import*
 
 
-myfigsize = [6.44,4]
+myfigsize = (15/2.54, 10/2.54)
 
 ################## change everything you need here #######################
 
-parametric_study = True # to launch post_process on a parametric study
-skip_plot = True # to skip the plots
-multilayer_study = True # to compute physical properties in multilayer case
+parametric_study = False # to launch post_process on a parametric study
+skip_plot = False # to skip the plots
+multilayer_study = False # to compute physical properties in multilayer case
 
 ############# No parametric study ################
 
@@ -34,28 +34,32 @@ multilayer_study = True # to compute physical properties in multilayer case
 
 list_files =['test-monolayer.pkl','test-multilayer.pkl','test-multilayer-80.pkl']
 list_files = ['test-fully_coupled-10l.pkl']
-list_files = ['MFA0_deg-45.000-Em-1000000.000.pkl']
-# list_files = ['test5deg-no_fish.pkl']
+list_files = ['MFA0_deg-75.000-Em-10000000.000.pkl']
+list_files = ['multi-G_forced-10.000-Vf-0.100.pkl','multi-G_forced-8.000-Vf-0.100.pkl']
+list_files = ['multi-classic.pkl']
+list_files = ['multi-with_rotation_change_deposition.pkl']
 #list_files = ['test-rotation_only-80l.pkl']
-list_files = ['10l-G8e-7.pkl','30l-G8e-7.pkl','50l-G8e-7.pkl','80l-G8e-7.pkl','120l-G8e-7.pkl','180l-G8e-7.pkl','260l-G8e-7.pkl']
-list_files = ['80l-G8e-7.pkl']
+# list_files = ['10l-G8e-7.pkl','30l-G8e-7.pkl','50l-G8e-7.pkl','80l-G8e-7.pkl','120l-G8e-7.pkl','180l-G8e-7.pkl','260l-G8e-7.pkl']
+# list_files = ['test80l.pkl','test280l.pkl']
+# list_files = ['test-low_MFA-high_AR.pkl']
 # my_legend = ['1 layer','40 layers','80 layers','120 layers']
-my_legend = ['80','120','180','260']
+my_legend = ['classic']
 # my_legend = ['30deg ','60','90deg']
 legend_title = r"$MFA_0 (\circ)$"
-legend_title = r"$n_l$"
+legend_title = r"$\dot{\varepsilon_a}$"
 
 #############  Parametric_study ################
 
 save_data_parametric = True # to save some parametric study results (!! CHANGE THE FILE NAME BELOW !!)
 read_data_file = False # to open some additional data to get computed mechanical constants
 
-parameter_name = ['G_forced','eps0']  # list of parameters to save along with the results
+parameter_name = ['MFA0_deg','eps0']  # list of parameters to save along with the results
+#parameter_name = ['G_forced','Vf']  #
 # filename pattern for parametric study
-pattern = r"multi-G_forced-([-\d.]+)-eps0-([-\d.]+).pkl"  
+pattern = r"MFA0_deg-([-\d.]+)-eps0-([-\d.]+).pkl"  
 folder = "../runs/"
 
-data_file = "multi-effect_eps0.pkl" # data file to write
+data_file = "effect_eps0.pkl" # data file to write
 
 data2open = ["data_effect_MFA-lowdt.pkl"] # data file to open
 
@@ -71,6 +75,7 @@ if parametric_study==True:
 
 my_color = ['blue','red','orange','green','magenta'] # list color for plots
 size = len(list_files) # get the number of files
+lines = ["-","--","-."]
 
 print ("There are " +str(size)+" simulations to analyse.")
 
@@ -83,9 +88,10 @@ param2save = np.zeros((size,len(parameter_name)))
 if multilayer_study==True:
     sigma_saved = np.zeros((size))
 
-fig= plt.figure(12,figsize=myfigsize)
-ax = fig.add_axes([0,0,1,1])
-axins = fig.add_axes([0.635,0.3,0.3,0.3])  # Location of the inset
+if skip_plot==False: # define some elements for the plot with an inset
+    fig= plt.figure(12,figsize=myfigsize)
+    ax = fig.add_axes([0,0,1,1])
+    # axins = fig.add_axes([0.635,0.3,0.3,0.3])  # Location of the inset
 
 for i in range(size): # loop to open the files one by one and plot things
     print("Simulation running: " + str(list_files[i]))
@@ -128,6 +134,8 @@ for i in range(size): # loop to open the files one by one and plot things
     W_sum = np.zeros((nt,p.nl)) 
     eps_t = np.zeros((p.nl,nt)) # prepare space for total deformation
     MFA = np.zeros((p.nl,nt))
+    MFA_mean = np.zeros((nt,1)) 
+    MFA_median = np.zeros((nt,1))
     yields_rotated = np.zeros((3,p.nl,nt))
     k_pressure=0
     p_forcing = np.zeros((len(t)))
@@ -193,6 +201,22 @@ for i in range(size): # loop to open the files one by one and plot things
     if (hasattr(p, "no_rotation") and p.no_rotation==True): 
         MFA = np.arctan(np.tan(theta_depo)*np.exp(np.zeros((nt,p.nl)))) # no rotation case
  
+    # compute mean MFA angle : 
+    for k in range(nt):
+        MFA_mean[k] = np.dot(MFA[k],Wa[k])/WaT[k]
+        MFA_median[k] = np.median(MFA[k])
+    print(' ---- Mean MFA at the end is  ----')
+    print(f"{MFA_mean[-1]/np.pi*180} deg")
+    
+    print(' ---- MEDIAN MFA at the end is  ----')
+    print(f"{MFA_median[-1]/np.pi*180} deg")
+    
+    ### find the z position where the stress is the closest to the mean value
+    idx_mean = (np.abs(sa[-1,:] - sa_mean[-1,0])).argmin()
+    
+    print(' ---- MFA at mean stress in the end is  ----')
+    print(f"{MFA[-1,idx_mean]*180/np.pi} deg")
+    
     # # Compute eigenvectors
     # # First, based on local layer values
     # Rz = np.sqrt(((sa-sl)/2)**2+tau**2)
@@ -333,49 +357,49 @@ for i in range(size): # loop to open the files one by one and plot things
     ########## Skip plots if you want
     if skip_plot==True: continue
     ######### Plots ##########
-    plt.figure(1,figsize=myfigsize)
-    plt.plot(th,(La)*1000000,label=my_legend[i])
-    # plt.plot([150, 150], [0, 84],':b',linewidth=1.5)
-    # plt.plot([90, 90], [0, 42],color='orange',linewidth=1.5,linestyle=':')
-    # plt.xlim((0,100))
-    # plt.ylim((0,1000))
-    plt.legend(loc='best',title=legend_title)
-    #plt.yscale('log')
-    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{R [$\mu$m]}", fontsize=16)
-    plt.title(r"$\textbf{Cell radius}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
+    # plt.figure(1,figsize=myfigsize)
+    # plt.plot(th,(La)*1000000,label=my_legend[i])
+    # # plt.plot([150, 150], [0, 84],':b',linewidth=1.5)
+    # # plt.plot([90, 90], [0, 42],color='orange',linewidth=1.5,linestyle=':')
+    # # plt.xlim((0,100))
+    # # plt.ylim((0,1000))
+    # #plt.legend(loc='best',title=legend_title)
+    # #plt.yscale('log')
+    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # plt.ylabel(r"\textbf{R [$\mu$m]}", fontsize=16)
+    # plt.title(r"$\textbf{Cell radius}$", fontsize=16)
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
     
 
-    ax.plot(th,sa_mean/1e6,label=my_legend[i])
-    ax.legend(loc='best',title=legend_title)
-    #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
-    # plt.ylim((1,1.5))
-    # plt.xlim((20,60))
-    ax.set_xlabel(r"\textbf{t [h]}", fontsize=16)
-    ax.set_ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
-    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    # plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
-    ax.set_title(r"$\textbf{Mean anticlinal wall stress}$", fontsize=16)
-    # # Set grid and minor ticks
-    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-    ax.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    ax.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    ax.indicate_inset([800,2.6,200,0.2],axins, edgecolor="blue")
+    # ax.plot(th,sa_mean/1e6,label=my_legend[i])
+    # ax.legend(loc='best',title=legend_title)
+    # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
+    # # plt.ylim((1,1.5))
+    # # plt.xlim((20,60))
+    # ax.set_xlabel(r"\textbf{t [h]}", fontsize=16)
+    # ax.set_ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
+    # # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # # plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
+    # ax.set_title(r"$\textbf{Mean wall stress}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # ax.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # ax.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # ax.indicate_inset([800,2.6,200,0.2],axins, edgecolor="blue")
     # plt.tight_layout()
     # plt.show()
     
     # Create the inset plot
-    axins.plot(th,sa_mean/1e6,label=my_legend[i])
-    axins.set_xlim(800, 1000)  # Adjust x-axis limits for the inset
-    axins.set_ylim(2.6, 2.8)  # Adjust y-axis limits for the inset
-    ax.indicate_inset_zoom(axins, edgecolor="blue")
+    # axins.plot(th,sa_mean/1e6,label=my_legend[i])
+    # axins.set_xlim(800, 1000)  # Adjust x-axis limits for the inset
+    # axins.set_ylim(2.6, 2.8)  # Adjust y-axis limits for the inset
+    # ax.indicate_inset_zoom(axins, edgecolor="blue")
     # Plot data in the inset
     #axins.plot(th,sa_mean/1e6)
     #axins.plot(x, y2, label='cos(x)')
@@ -384,21 +408,27 @@ for i in range(size): # loop to open the files one by one and plot things
 
     
     plt.figure(2,figsize=myfigsize)
-    plt.plot(th,sa/1e6,label=my_legend[i])
-    if p.nl==1:
-        plt.legend(loc='best',title=legend_title)
+    plt.plot(th,sa_mean/1e6,label=my_legend[i],linestyle=lines[i])
+    plt.legend(loc='best',title=legend_title)
+    # if p.nl==1:
+    #     plt.legend(loc='best',title=legend_title)
     #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
     # plt.ylim((1,1.5))
     # plt.xlim((20,60))
     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{${\sigma_a}$ [MPa]}", fontsize=16)
-    plt.title(r"$\textbf{anticlinal wall stress}$", fontsize=16)
+    plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.minorticks_on()
     # Use LaTeX for tick labels (optional)
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
+    ax = plt.gca()
+    plt.text(-0.15, 1.05, '($\t{c}$)', transform=ax.transAxes, fontsize=16,
+           verticalalignment='top', horizontalalignment='left')
+    
+    ##save figure
+    #plt.savefig('multi_stress_stationnary.png',format='png', dpi=500)
     
     # plt.figure(13)
     # #plt.plot(th,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
@@ -417,202 +447,18 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     # plt.tight_layout()
     
-    if p.nl==1:
-        plt.figure(18,figsize=myfigsize)
-        plt.plot(th,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
-        # plt.plot(sa/1e6,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
-        plt.legend(loc='best',title=legend_title)
+    # if p.nl==1:
+    #     plt.figure(18,figsize=myfigsize)
+    #     plt.plot(th,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
+    #     # plt.plot(sa/1e6,yields_rotated[0,0,:]/1e6,label=my_legend[i],marker='x')
+    #     plt.legend(loc='best',title=legend_title)
     
-        plt.plot([0, th[-1]], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=1.5)
-        # plt.ylim((1,1.5))
-        # plt.xlim((20,60))
-        plt.xlabel(r"\textbf{${t_h}$ [h]}", fontsize=16)
-        plt.ylabel(r"\textbf{${\sigma_Y^{a}}$ [MPa]}", fontsize=16)
-        plt.title(r"$\textbf{Yield stress in the global frame}$", fontsize=16)
-        # Set grid and minor ticks
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-        plt.minorticks_on()
-        # Use LaTeX for tick labels (optional)
-        plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-        plt.tight_layout()
-    
-    # plt.figure(18)
-    # plt.plot(th,yields[1,0,:]/1e6,label=my_legend[i])
-    # # plt.legend(loc='best',title=r"$MFA_0$")
-    # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
-    # # plt.ylim((1,1.5))
-    # # plt.xlim((20,60))
-    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    # plt.ylabel(r"\textbf{${\sigma_Y^{1}}$ [MPa]}", fontsize=16)
-    # plt.title(r"$\textbf{Yield stress 1 in the MF frame}$", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
-    
-    plt.figure(14,figsize=myfigsize)
-    plt.plot(th,sl/1e6,label=my_legend[i])
-    if p.nl==1:
-        plt.legend(loc='best',title=legend_title)
-    #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
-    # plt.ylim((1,1.5))
-    # plt.xlim((20,60))
-    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{${\sigma_l}$ [MPa]}", fontsize=16)
-    plt.title(r"$\textbf{longitudinal wall stress}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    
-    plt.figure(15,figsize=myfigsize)
-    plt.plot(th,tau/1e6,label=my_legend[i])
-    # phi2 = np.arctan(tau/(-Rz+(sl-sa)/2))*180/np.pi
-    # plt.plot(th,90-phi1,label=my_legend[i],marker='o',linestyle='none')
-    # plt.plot(th,90-phi1_mean,color='black',linestyle='--')
-    # plt.plot(th,phi1-90+MFA*180/np.pi,label=my_legend[i],linestyle='--')
-    # plt.plot(th,lam2,label=my_legend[i],linestyle='--')
-    if p.nl==1:
-        plt.legend(loc='best',title=legend_title)
-    #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
-    # plt.ylim((1,1.5))
-    # plt.xlim((20,60))
-    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{${\tau}$ [MPa]}", fontsize=16)
-    plt.title(r"$\textbf{Shear}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    
-    plt.figure(16,figsize=myfigsize)
-    plt.plot(th,Tsai[0,:],label=my_legend[i])
-    # phi2 = np.arctan(tau/(-Rz+(sl-sa)/2))*180/np.pi
-    # plt.plot(th,90-phi1,label=my_legend[i],marker='o',linestyle='none')
-    # plt.plot(th,90-phi1_mean,color='black',linestyle='--')
-    # plt.plot(th,phi1-90+MFA*180/np.pi,label=my_legend[i],linestyle='--')
-    # plt.plot(th,lam2,label=my_legend[i],linestyle='--')
-    plt.legend(loc='best',title=legend_title)
-    #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
-    # plt.ylim((1,1.5))
-    # plt.xlim((20,60))
-    plt.xlabel(r"\textbf{$t_h$ [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{${Tsai}$}", fontsize=16)
-    plt.title(r"$\textbf{Tsai-Hill value}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-        
-    plt.figure(3,figsize=myfigsize)
-    plt.plot(th,P/1e6,label=my_legend[i])    
-    plt.plot([0, p.t_end/3600], [PM/1e6, PM/1e6],':k',linewidth=1.5)
-    #plt.plot(th,P_lock/1e6,marker='v', markevery=8, linestyle='',color=my_color[i])
-    plt.legend(loc='best',title=legend_title)
-    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{$P$ [MPa]}", fontsize=16)
-    plt.title(r"$\textbf{Turgor pressure}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    
-    plt.figure(4,figsize=myfigsize)
-    
-    plt.plot(th,WaT*1000000,label=my_legend[i])
-    plt.legend(loc='best',title=legend_title)
-    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{Wa [$\mu$m]}", fontsize=16)
-    plt.title(r"$\textbf{Wall thickness}$", fontsize=16)
-    # Set grid and minor ticks
-    # plt.xlim((80,100))
-    # plt.ylim((3.5,4.5))
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    
-    # plt.figure(5)
-    # plt.plot(th,PI/1e6,color=my_color[i])
-    # # plt.legend(loc='best')
-    # plt.xlabel('t [h]')
-    # plt.ylabel('PI [MPa]')
-    
-    plt.figure(6,figsize=myfigsize)
-    # plt.scatter(eps_t[:,0]*100,sa_mean/1e6,c=th,cmap='viridis')
-    # plt.colorbar(label='Time [h]')
-    plt.plot(eps_t[:,0]*100,sa_mean/1e6,label=my_legend[i],marker='+')
-    if p.nl==1:
-        plt.plot([eps_t[0,0]*100, eps_t[-1,0]*100], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=1.5)
-        plt.plot(eps_t[:,0]*100,eps_t[:,0]*E[i]/1e6,'orange',linestyle='--')
-        plt.legend(loc='best',title=legend_title)
-        text_str = f"$\sigma_Y$ : {sY[0]/1e6:.2f} MPa ; E = {E[i]/1e6:.2f} MPa"
-        plt.text(0.455*eps_t[-1,0]*100,0.35*sa_mean[-1]/1e6,text_str, fontsize=14)
-    plt.ylim((0,np.max(sa_mean/1e6)))
-    plt.xlabel(r"\textbf{$\varepsilon^T$ $[\%]$}", fontsize=16)
-    plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
-    plt.title(r"$\textbf{Stress-deformation curve for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
-    
-
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    
-    
-    plt.figure(7,figsize=myfigsize)
-    plt.plot(th,theta_MT,label = 'MT angle')
-    plt.plot(th,phi1_mean,'--',label = 'Principal stress angle')
-    plt.legend(loc='best')
-    plt.xlabel(r"\textbf{$t_h$ $[h]$}", fontsize=16)
-    plt.ylabel(r"\textbf{$\theta$ [$\circ$]}", fontsize=16)
-    # plt.title(r"$\textbf{stress-defo}$", fontsize=16)
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    
-    
-    # plt.plot(th,sa_mean/1e6,label=my_legend[i],color=my_color[i])
-    # plt.legend(loc='best',title=legend_title)
-    # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
-    # # plt.ylim((1,1.5))
-    # # plt.xlim((20,60))
-    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    # plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
-    # plt.title(r"$\textbf{Mean anticlinal wall stress}$", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
-    
-    # if len(list_files)==1:
-    #     plt.figure(7)
-    #     plt.plot(th,sa/1e6,label='anticlinal')
-    #     plt.plot(th,sl/1e6,'--',label='longitudinal')
-    #     plt.plot(th,tau/1e6,':',label='shear')
-    #     # plt.legend(loc='best')
-    #     #plt.plot([0, p.t_end/3600], [1, 1],':k',linewidth=1.5)
-    #     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    #     plt.ylabel(r"\textbf{$\sigma$ [MPa]}", fontsize=16)
-    #     plt.title(r"$\textbf{Stresses}$", fontsize=16)
+    #     plt.plot([0, th[-1]], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=1.5)
+    #     # plt.ylim((1,1.5))
+    #     # plt.xlim((20,60))
+    #     plt.xlabel(r"\textbf{${t_h}$ [h]}", fontsize=16)
+    #     plt.ylabel(r"\textbf{${\sigma_Y^{a}}$ [MPa]}", fontsize=16)
+    #     plt.title(r"$\textbf{Yield stress in the global frame}$", fontsize=16)
     #     # Set grid and minor ticks
     #     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     #     plt.minorticks_on()
@@ -620,16 +466,160 @@ for i in range(size): # loop to open the files one by one and plot things
     #     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     #     plt.tight_layout()
     
-    # plt.figure(16)
-    # plt.plot(th,yields[0,0,:]/1e6,label='anticlinal')
-    # plt.plot(th,yields[1,0,:]/1e6,'--',label='longitudinal')
-    # plt.plot(th,yields[2,0,:]/1e6,'--',label='shear')
+    # # plt.figure(18)
+    # # plt.plot(th,yields[1,0,:]/1e6,label=my_legend[i])
+    # # # plt.legend(loc='best',title=r"$MFA_0$")
+    # # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
+    # # # plt.ylim((1,1.5))
+    # # # plt.xlim((20,60))
+    # # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # # plt.ylabel(r"\textbf{${\sigma_Y^{1}}$ [MPa]}", fontsize=16)
+    # # plt.title(r"$\textbf{Yield stress 1 in the MF frame}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # # plt.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # plt.tight_layout()
+    
+    # plt.figure(14,figsize=myfigsize)
+    # plt.plot(th,sl/1e6,label=my_legend[i])
+    # if p.nl==1:
+    #     plt.legend(loc='best',title=legend_title)
+    # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
+    # # plt.ylim((1,1.5))
+    # # plt.xlim((20,60))
+    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # plt.ylabel(r"\textbf{${\sigma_l}$ [MPa]}", fontsize=16)
+    # plt.title(r"$\textbf{longitudinal wall stress}$", fontsize=16)
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+    
+    # plt.figure(15,figsize=myfigsize)
+    # plt.plot(th,tau/1e6,label=my_legend[i])
+    # # phi2 = np.arctan(tau/(-Rz+(sl-sa)/2))*180/np.pi
+    # # plt.plot(th,90-phi1,label=my_legend[i],marker='o',linestyle='none')
+    # # plt.plot(th,90-phi1_mean,color='black',linestyle='--')
+    # # plt.plot(th,phi1-90+MFA*180/np.pi,label=my_legend[i],linestyle='--')
+    # # plt.plot(th,lam2,label=my_legend[i],linestyle='--')
+    # if p.nl==1:
+    #     plt.legend(loc='best',title=legend_title)
+    # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
+    # # plt.ylim((1,1.5))
+    # # plt.xlim((20,60))
+    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # plt.ylabel(r"\textbf{${\tau}$ [MPa]}", fontsize=16)
+    # plt.title(r"$\textbf{Shear}$", fontsize=16)
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+    
+    # plt.figure(16,figsize=myfigsize)
+    # plt.plot(th,Tsai[0,:],label=my_legend[i])
+    # # phi2 = np.arctan(tau/(-Rz+(sl-sa)/2))*180/np.pi
+    # # plt.plot(th,90-phi1,label=my_legend[i],marker='o',linestyle='none')
+    # # plt.plot(th,90-phi1_mean,color='black',linestyle='--')
+    # # plt.plot(th,phi1-90+MFA*180/np.pi,label=my_legend[i],linestyle='--')
+    # # plt.plot(th,lam2,label=my_legend[i],linestyle='--')
+    # plt.legend(loc='best',title=legend_title)
+    # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
+    # # plt.ylim((1,1.5))
+    # # plt.xlim((20,60))
+    # plt.xlabel(r"\textbf{$t_h$ [h]}", fontsize=16)
+    # plt.ylabel(r"\textbf{${Tsai}$}", fontsize=16)
+    # plt.title(r"$\textbf{Tsai-Hill value}$", fontsize=16)
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+        
+    # plt.figure(3,figsize=myfigsize)
+    # plt.plot(th,P/1e6,label=my_legend[i])    
+    # plt.plot([0, p.t_end/3600], [PM/1e6, PM/1e6],':k',linewidth=1.5)
+    # #plt.plot(th,P_lock/1e6,marker='v', markevery=8, linestyle='',color=my_color[i])
+    # plt.legend(loc='best',title=legend_title)
+    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # plt.ylabel(r"\textbf{$P$ [MPa]}", fontsize=16)
+    # plt.title(r"$\textbf{Turgor pressure}$", fontsize=16)
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+    
+    # plt.figure(4,figsize=myfigsize)
+    
+    # plt.plot(th,WaT*1000000,label=my_legend[i])
+    # plt.legend(loc='best',title=legend_title)
+    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # plt.ylabel(r"\textbf{Wa [$\mu$m]}", fontsize=16)
+    # plt.title(r"$\textbf{Wall thickness}$", fontsize=16)
+    # # Set grid and minor ticks
+    # # plt.xlim((80,100))
+    # # plt.ylim((3.5,4.5))
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+    
+    # # plt.figure(5)
+    # # plt.plot(th,PI/1e6,color=my_color[i])
+    # # # plt.legend(loc='best')
+    # # plt.xlabel('t [h]')
+    # # plt.ylabel('PI [MPa]')
+    
+    # plt.figure(6,figsize=myfigsize)
+    # # plt.scatter(eps_t[:,0]*100,sa_mean/1e6,c=th,cmap='viridis')
+    # # plt.colorbar(label='Time [h]')
+    # plt.plot(eps_t[:,0]*100,sa_mean/1e6,label=my_legend[i])
+    # if p.nl==1:
+    #     plt.plot([eps_t[0,0]*100, eps_t[-1,0]*100], [sY[i]/1e6, sY[i]/1e6],':k',linewidth=2)
+    #     plt.plot(eps_t[:,0]*100,eps_t[:,0]*E[i]/1e6,'orange',linestyle='--',linewidth=2)
+    #     #plt.legend(loc='best',title=legend_title)
+    #     text_str = f"$\sigma_Y$ : {sY[0]/1e6:.2f} MPa"
+    #     text2 = f"E = {E[i]/1e6:.2f} MPa"
+    #     plt.text(8,4.5,text_str, fontsize=14)
+    #     plt.text(0.45,1.5,text2, fontsize=14, rotation=63)
+    #     ax = plt.gca()
+    #     plt.text(-0.15, 1.05, '($\t{a}$)', transform=ax.transAxes, fontsize=16,
+    #             verticalalignment='top', horizontalalignment='left')
+    # plt.ylim((0,1.2*np.max(sa_mean/1e6)))
+    # plt.xlim((0,15))
+    # plt.xlabel(r"\textbf{$\varepsilon_T$ $[\%]$}", fontsize=16)
+    # # plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
+    # plt.ylabel(r"\textbf{${\sigma_a}$ [MPa]}", fontsize=16)
+    # #plt.title(r"$\textbf{Stress-deformation curve for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
+    
+
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+    
+    # # save figure
+    # #plt.savefig('traction_test.png',format='png', dpi=500)
+    
+    
+    # plt.figure(7,figsize=myfigsize)
+    # plt.plot(th,theta_MT,label = 'MT angle')
+    # plt.plot(th,phi1_mean,'--',label = 'Principal stress angle')
     # plt.legend(loc='best')
-    # #plt.plot(th,sl,'--')
-    # #plt.plot([0, p.t_end/3600], [1, 1],':k',linewidth=1.5)
-    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    # plt.ylabel(r"\textbf{$\sigma_Y$ [MPa]}", fontsize=16)
-    # plt.title(r"$\textbf{Yields for all layers}$", fontsize=16)
+    # plt.xlabel(r"\textbf{$t_h$ $[h]$}", fontsize=16)
+    # plt.ylabel(r"\textbf{$\theta$ [$\circ$]}", fontsize=16)
+    # # plt.title(r"$\textbf{stress-defo}$", fontsize=16)
     # # Set grid and minor ticks
     # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     # plt.minorticks_on()
@@ -637,43 +627,80 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     # plt.tight_layout()
     
-    # plt.figure(8)
-    # plt.plot(th,Q,label=my_legend[i])
-    # # plt.ylim((0,1.1))
-    # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    # plt.ylabel(r"\textbf{$Q$ [m3/s]}", fontsize=16)
-    # plt.title(r"$\textbf{Flow rate}$", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
+    
+    # # plt.plot(th,sa_mean/1e6,label=my_legend[i],color=my_color[i])
+    # # plt.legend(loc='best',title=legend_title)
+    # # #plt.plot([0, p.t_end/3600], [p.sig_Y/1e6, p.sig_Y/1e6],':k',linewidth=1.5)
+    # # # plt.ylim((1,1.5))
+    # # # plt.xlim((20,60))
+    # # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # # plt.ylabel(r"\textbf{$\overline{\sigma_a}$ [MPa]}", fontsize=16)
+    # # plt.title(r"$\textbf{Mean anticlinal wall stress}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # # plt.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # plt.tight_layout()
+    
+    # # if len(list_files)==1:
+    # #     plt.figure(7)
+    # #     plt.plot(th,sa/1e6,label='anticlinal')
+    # #     plt.plot(th,sl/1e6,'--',label='longitudinal')
+    # #     plt.plot(th,tau/1e6,':',label='shear')
+    # #     # plt.legend(loc='best')
+    # #     #plt.plot([0, p.t_end/3600], [1, 1],':k',linewidth=1.5)
+    # #     plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # #     plt.ylabel(r"\textbf{$\sigma$ [MPa]}", fontsize=16)
+    # #     plt.title(r"$\textbf{Stresses}$", fontsize=16)
+    # #     # Set grid and minor ticks
+    # #     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # #     plt.minorticks_on()
+    # #     # Use LaTeX for tick labels (optional)
+    # #     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # #     plt.tight_layout()
+    
+    # # plt.figure(16)
+    # # plt.plot(th,yields[0,0,:]/1e6,label='anticlinal')
+    # # plt.plot(th,yields[1,0,:]/1e6,'--',label='longitudinal')
+    # # plt.plot(th,yields[2,0,:]/1e6,'--',label='shear')
+    # # plt.legend(loc='best')
+    # # #plt.plot(th,sl,'--')
+    # # #plt.plot([0, p.t_end/3600], [1, 1],':k',linewidth=1.5)
+    # # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # # plt.ylabel(r"\textbf{$\sigma_Y$ [MPa]}", fontsize=16)
+    # # plt.title(r"$\textbf{Yields for all layers}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # # plt.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # plt.tight_layout()
+    
+    # # plt.figure(8)
+    # # plt.plot(th,Q,label=my_legend[i])
+    # # # plt.ylim((0,1.1))
+    # # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # # plt.ylabel(r"\textbf{$Q$ [m3/s]}", fontsize=16)
+    # # plt.title(r"$\textbf{Flow rate}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # # plt.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # plt.tight_layout()
     
         
 
     
-    plt.figure(10,figsize=myfigsize)
-    plt.plot(th,G*3600,label=my_legend[i])
-    # plt.ylim((0,1.1))
-    plt.legend(loc='best',title=legend_title)
-    plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    plt.ylabel(r"\textbf{Growth rate [1/h]}", fontsize=16)
-    plt.title(r"$\textbf{Growth rate}$", fontsize=16)
-    plt.legend(loc='best')
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    
-    # plt.figure(11)
-    # plt.plot(th,eps_t*100)
+    # plt.figure(10,figsize=myfigsize)
+    # plt.plot(th,G*3600,label=my_legend[i])
     # # plt.ylim((0,1.1))
+    # plt.legend(loc='best',title=legend_title)
     # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
-    # plt.ylabel(r"\textbf{$\varepsilon_T$ $[\%]$}", fontsize=16)
-    # plt.title(r"$\textbf{Total deformation in \%}$", fontsize=16)
+    # plt.ylabel(r"\textbf{Growth rate [1/h]}", fontsize=16)
+    # plt.title(r"$\textbf{Growth rate}$", fontsize=16)
+    # plt.legend(loc='best')
     # # Set grid and minor ticks
     # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     # plt.minorticks_on()
@@ -681,171 +708,284 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     # plt.tight_layout()
     
-    # plt.figure(12)
-    # plt.plot(W_sum[-1,:]*1e6,MFA[-1,:]*180/np.pi)
-    # # plt.ylim((0,1.1))
-    # plt.xlabel(r"\textbf{W [µm]}", fontsize=16)
-    # plt.ylabel(r"\textbf{MFA in degrees}", fontsize=16)
-    # plt.title(r"$\textbf{MFA final distribution for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
+    # # plt.figure(11)
+    # # plt.plot(th,eps_t*100)
+    # # # plt.ylim((0,1.1))
+    # # plt.xlabel(r"\textbf{t [h]}", fontsize=16)
+    # # plt.ylabel(r"\textbf{$\varepsilon_T$ $[\%]$}", fontsize=16)
+    # # plt.title(r"$\textbf{Total deformation in \%}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # # plt.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # plt.tight_layout()
     
-    # plt.figure(13)
-    # plt.hist(MFA[-1]*180/np.pi,bins=20,density=True)
-    # # plt.ylim((0,1.1))
-    # plt.xlabel(r"\textbf{MFA range}", fontsize=16)
-    # plt.ylabel(r"\textbf{PDF}", fontsize=16)
-    # plt.title(r"$\textbf{MFA final distribution}$", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
+    # # plt.figure(12)
+    # # plt.plot(W_sum[-1,:]*1e6,MFA[-1,:]*180/np.pi)
+    # # # plt.ylim((0,1.1))
+    # # plt.xlabel(r"\textbf{W [µm]}", fontsize=16)
+    # # plt.ylabel(r"\textbf{MFA in degrees}", fontsize=16)
+    # # plt.title(r"$\textbf{MFA final distribution for $\phi_0$="+str(p.MFA0_deg)+" degrees}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # # plt.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # plt.tight_layout()
     
-    if p.nl==1:
-        plt.figure(17,figsize=myfigsize)
-        # plt.plot(G*3600,sa_mean,label=my_legend[i],color=my_color[i])
-        # plt.scatter((sa_mean-sY[i])/1e6,G*3600,c=th,cmap='viridis')
-        #mask = sa_mean>sY[i]
-        plt.plot(th,tau_visc,label=my_legend[i])
-        plt.plot([th[0],th[-1]],[5, 5],':k',linewidth=1.5)
-        # plt.xlim([150,400])
-        plt.ylim([0,10])
-        # plt.plot(th,G_lock*3600,marker='v', markevery=8, linestyle='',color=my_color[i])
-        # plt.ylim((0,1.1))
-        # plt.yscale('log')
-        plt.legend(loc='best',title=legend_title)
-        plt.xlabel(r"\textbf{$t_h$ [h]}", fontsize=16)
-        plt.ylabel(r"\textbf{$\tau_{visq}$ [h]}", fontsize=16)
-        plt.title(r"$\textbf{Viscous time}$", fontsize=16)
-        # Set grid and minor ticks
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-        plt.minorticks_on()
-        # Use LaTeX for tick labels (optional)
-        plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-        plt.tight_layout()
+    # # plt.figure(13)
+    # # plt.hist(MFA[-1]*180/np.pi,bins=20,density=True)
+    # # # plt.ylim((0,1.1))
+    # # plt.xlabel(r"\textbf{MFA range}", fontsize=16)
+    # # plt.ylabel(r"\textbf{PDF}", fontsize=16)
+    # # plt.title(r"$\textbf{MFA final distribution}$", fontsize=16)
+    # # # Set grid and minor ticks
+    # # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # # plt.minorticks_on()
+    # # # Use LaTeX for tick labels (optional)
+    # # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # # plt.tight_layout()
+    
+    # if p.nl==1:
+    #     plt.figure(17,figsize=myfigsize)
+    #     # plt.plot(G*3600,sa_mean,label=my_legend[i],color=my_color[i])
+    #     # plt.scatter((sa_mean-sY[i])/1e6,G*3600,c=th,cmap='viridis')
+    #     #mask = sa_mean>sY[i]
+    #     plt.plot(th,tau_visc,label=my_legend[i])
+    #     plt.plot([th[0],th[-1]],[5, 5],':k',linewidth=1.5)
+    #     # plt.xlim([150,400])
+    #     plt.ylim([0,10])
+    #     # plt.plot(th,G_lock*3600,marker='v', markevery=8, linestyle='',color=my_color[i])
+    #     # plt.ylim((0,1.1))
+    #     # plt.yscale('log')
+    #     plt.legend(loc='best',title=legend_title)
+    #     plt.xlabel(r"\textbf{$t_h$ [h]}", fontsize=16)
+    #     plt.ylabel(r"\textbf{$\tau_{visq}$ [h]}", fontsize=16)
+    #     plt.title(r"$\textbf{Viscous time}$", fontsize=16)
+    #     # Set grid and minor ticks
+    #     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    #     plt.minorticks_on()
+    #     # Use LaTeX for tick labels (optional)
+    #     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    #     plt.tight_layout()
     
     
-    plt.figure(9,figsize=myfigsize)
-    fig, ax = plt.subplots()
-    # Spatio-temporal stress profile
-    # Define your desired colormap (e.g., 'viridis')
-    cmap = plt.cm.viridis
+    # plt.figure(9,figsize=myfigsize)
+    # fig, ax = plt.subplots()
+    # # Spatio-temporal stress profile
+    # # Define your desired colormap (e.g., 'viridis')
+    # cmap = plt.cm.viridis
     
-    # Select equally distributed timesteps (adjust divisor for different numbers)
-    selected_timesteps = np.linspace(10, nt-1, 16, dtype=int)  # Use np.linspace for even distribution
+    # # Select equally distributed timesteps (adjust divisor for different numbers)
+    # selected_timesteps = np.linspace(25, nt-1, 50, dtype=int)  # Use np.linspace for even distribution
     
-    # Create a color mapper object for the selected timesteps
-    norm = plt.Normalize(vmin=th[selected_timesteps[0]], vmax=th[selected_timesteps[-1]])
-    sm = ScalarMappable(cmap=cmap, norm=norm)
+    # # Create a color mapper object for the selected timesteps
+    # norm = plt.Normalize(vmin=th[selected_timesteps[0]], vmax=th[selected_timesteps[-1]])
+    # sm = ScalarMappable(cmap=cmap, norm=norm)
     
-    # Plot loop for each timestep
-    for k,timestep in enumerate(selected_timesteps):
-        # Get color based on timestep
-        color = sm.to_rgba(th[timestep])
+    # # Plot loop for each timestep
+    # for k,timestep in enumerate(selected_timesteps):
+    #     # Get color based on timestep
+    #     color = sm.to_rgba(th[timestep])
         
-        # Get data points where wa is not zero (boolean mask)
-        mask = Wa[timestep] != 0
+    #     # Get data points where wa is not zero (boolean mask)
+    #     mask = Wa[timestep] != 0
         
-        # Filter W_sum and sa based on the mask
-        W_sum_f = W_sum[timestep][mask]
-        sa_f = sa[timestep][mask]
+    #     # Filter W_sum and sa based on the mask
+    #     W_sum_f = W_sum[timestep][mask]
+    #     sa_f = sa[timestep][mask]
+        
+    #     # add left point for plot clarity
+    #     testW = np.insert(W_sum_f,0,0)
+    #     testS = np.insert(sa_f,0,sa_f[0])
                 
-        # # Local average for non-edge elements (vectorized)
-        # W_sum_f[1:-1] = (W_sum_f[:-2] + W_sum_f[2:]) / 2
+    #     # # Local average for non-edge elements (vectorized)
+    #     # W_sum_f[1:-1] = (W_sum_f[:-2] + W_sum_f[2:]) / 2
         
-        # # plot at mean layer thickness values
-        # if len(W_sum_f) > 1:  # Check for at least two elements
-        #     W_sum_f[0] = (W_sum_f[0]) / 2  # Average first element
-        #     W_sum_f[-1] = (W_sum_f[-1] + W_sum_f[-2]) / 2  # Average last element
-        # else:
-        #     W_sum_f[0] = (W_sum_f[0]) / 2 
+    #     # # plot at mean layer thickness values
+    #     # if len(W_sum_f) > 1:  # Check for at least two elements
+    #     #     W_sum_f[0] = (W_sum_f[0]) / 2  # Average first element
+    #     #     W_sum_f[-1] = (W_sum_f[-1] + W_sum_f[-2]) / 2  # Average last element
+    #     # else:
+    #     #     W_sum_f[0] = (W_sum_f[0]) / 2 
 
-        # Plot with color from colormap
-        ax.plot(W_sum_f*1e6, sa_f*1e-6, color=color, label=f'Time: {th[timestep]}',marker='.')
+    #     # Plot with color from colormap
+    #     ax.plot(testW*1e6, testS*1e-6, color=color, label=f'Time: {th[timestep]}')
         
-    # Add colorbar
-    fig.colorbar(sm, label='Time [h]', ax=ax)  # Add colorbar to the axes    
-    #plt.plot(W_sum[-1]*1e6,sa[-1]/1e6,color=my_color[i])
-    # plt.ylim((0,1.1))
-    #plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, np.max(np.max(sa, axis=1))/1e6],':k',linewidth=1.5)
-    plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
-    plt.ylabel(r"\textbf{$\sigma_a$ [MPa]}", fontsize=16)
-    plt.title(r"$\textbf{Anticlinal stress profiles}$", fontsize=16)
-    #plt.legend(loc='best')
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    dpi = 300  # Dots per inch
-    # Save the figure as a high-resolution JPEG
-    #plt.savefig("stress_profiles-W_cste.jpeg", dpi=dpi)
+    # # Add colorbar
+    # fig.colorbar(sm, label='Time [h]', ax=ax)  # Add colorbar to the axes    
+    # #plt.plot(W_sum[-1]*1e6,sa[-1]/1e6,color=my_color[i])
+    # # plt.ylim((0,1.1))
+    # #plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, np.max(np.max(sa, axis=1))/1e6],':k',linewidth=1.5)
+    # plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
+    # plt.ylabel(r"\textbf{$\sigma_a$ [MPa]}", fontsize=16)
+    # #plt.title(r"$\textbf{Wall stress profiles}$", fontsize=16)
+    # #plt.legend(loc='best')
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+    # dpi = 500  # Dots per inch
+    # ax = plt.gca()
+    # plt.text(-0.1, 1.05, '($\t{d}$)', transform=ax.transAxes, fontsize=16,
+    #         verticalalignment='top', horizontalalignment='left')
+    # # Save the figure as a high-resolution JPEG
+    # # plt.savefig('wall_stress_non_stationnary_with_rotation.png',format='png', dpi=500)
     
     
        
-    plt.figure(13,figsize=myfigsize)
-    fig, ax = plt.subplots()
-    # Spatio-temporal stress profile
-    # Define your desired colormap (e.g., 'viridis')
-    cmap = plt.cm.viridis
+    # plt.figure(13,figsize=myfigsize)
+    # fig, ax = plt.subplots()
+    # # Spatio-temporal stress profile
+    # # Define your desired colormap (e.g., 'viridis')
+    # cmap = plt.cm.viridis
     
-    # Select equally distributed timesteps (adjust divisor for different numbers)
-    selected_timesteps = np.linspace(10, nt-1, 16, dtype=int)  # Use np.linspace for even distribution
+    # # Select equally distributed timesteps (adjust divisor for different numbers)
+    # selected_timesteps = np.linspace(25, nt-1, 10, dtype=int)  # Use np.linspace for even distribution
     
-    # Create a color mapper object for the selected timesteps
-    norm = plt.Normalize(vmin=th[selected_timesteps[0]], vmax=th[selected_timesteps[-1]])
-    sm = ScalarMappable(cmap=cmap, norm=norm)
+    # # Create a color mapper object for the selected timesteps
+    # norm = plt.Normalize(vmin=th[selected_timesteps[0]], vmax=th[selected_timesteps[-1]])
+    # sm = ScalarMappable(cmap=cmap, norm=norm)
     
-    # Plot loop for each timestep
-    for k,timestep in enumerate(selected_timesteps):
-        # Get color based on timestep
-        color = sm.to_rgba(th[timestep])
+    # # Plot loop for each timestep
+    # for k,timestep in enumerate(selected_timesteps):
+    #     # Get color based on timestep
+    #     color = sm.to_rgba(th[timestep])
         
-        # Get data points where wa is not zero (boolean mask)
-        mask = Wa[timestep] != 0
+    #     # Get data points where wa is not zero (boolean mask)
+    #     mask = Wa[timestep] != 0
         
-        # Filter W_sum and sa based on the mask
-        W_sum_f = W_sum[timestep][mask]
-        MFA_f = MFA[timestep][mask]
+    #     # Filter W_sum and sa based on the mask
+    #     W_sum_f = W_sum[timestep][mask]
+    #     MFA_f = MFA[timestep][mask]
+        
+    #     # add left point for plot clarity
+    #     testW = np.insert(W_sum_f,0,0)
+    #     testMFA= np.insert(MFA_f,0,MFA_f[0])
                 
-        # # Local average for non-edge elements (vectorized)
-        # W_sum_f[1:-1] = (W_sum_f[:-2] + W_sum_f[2:]) / 2
+    #     # # Local average for non-edge elements (vectorized)
+    #     # W_sum_f[1:-1] = (W_sum_f[:-2] + W_sum_f[2:]) / 2
         
-        # # plot at mean layer thickness values
-        # if len(W_sum_f) > 1:  # Check for at least two elements
-        #     W_sum_f[0] = (W_sum_f[0]) / 2  # Average first element
-        #     W_sum_f[-1] = (W_sum_f[-1] + W_sum_f[-2]) / 2  # Average last element
-        # else:
-        #     W_sum_f[0] = (W_sum_f[0]) / 2 
+    #     # # plot at mean layer thickness values
+    #     # if len(W_sum_f) > 1:  # Check for at least two elements
+    #     #     W_sum_f[0] = (W_sum_f[0]) / 2  # Average first element
+    #     #     W_sum_f[-1] = (W_sum_f[-1] + W_sum_f[-2]) / 2  # Average last element
+    #     # else:
+    #     #     W_sum_f[0] = (W_sum_f[0]) / 2 
 
-        # Plot with color from colormap
-        ax.plot(W_sum_f*1e6, MFA_f*180/np.pi, color=color, label=f'Time: {th[timestep]}',marker='.')
+    #     # Plot with color from colormap
+    #     ax.plot(testW*1e6, testMFA*180/np.pi, color=color, label=f'Time: {th[timestep]}')
         
-    # Add colorbar
-    fig.colorbar(sm, label='Time [h]', ax=ax)  # Add colorbar to the axes    
-    #plt.plot(W_sum[-1]*1e6,sa[-1]/1e6,color=my_color[i])
-    # plt.ylim((0,1.1))
-    #plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, np.max(np.max(sa, axis=1))/1e6],':k',linewidth=1.5)
+        
+        
+    # # Add colorbar
+    # fig.colorbar(sm, label='Time [h]', ax=ax)  # Add colorbar to the axes    
+    # #plt.plot(W_sum[-1]*1e6,sa[-1]/1e6,color=my_color[i])
+    # # plt.ylim((0,1.1))
+    # #plt.plot([p.Wa0/(1+p.sig_Y/p.E)*1e6, p.Wa0/(1+p.sig_Y/p.E)*1e6], [0, np.max(np.max(sa, axis=1))/1e6],':k',linewidth=1.5)
+    # plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
+    # plt.ylabel(r"\textbf{$\phi^i$ [$\circ$]}", fontsize=16)
+    # #plt.title(r"$\textbf{MFA profiles}$", fontsize=16)
+    # #plt.legend(loc='best')
+    # # Set grid and minor ticks
+    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    # plt.minorticks_on()
+    # # Use LaTeX for tick labels (optional)
+    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+    # plt.tight_layout()
+    # dpi = 300  # Dots per inch
+    # # Save the figure as a high-resolution JPEG
+    # #plt.savefig("stress_profiles-W_cste.jpeg", dpi=dpi)
+    # ax = plt.gca()
+    # plt.show
+    # plt.text(-0.15, 1.05, '($\t{c}$)', transform=ax.transAxes, fontsize=16,
+    #         verticalalignment='top', horizontalalignment='left')
+    # # Save the figure as a high-resolution JPEG
+    # #.savefig('MFA_non_stationnary_with_rotation.png',format='png', dpi=500)
+    
+    #########################   Kimograph MFA #####################
+
+    # Utiliser pcolormesh pour tracer les données en fonction des positions réelles
+    # Créer une grille 2D pour les positions et les temps
+    # Ajouter une colonne fictive pour la couche 0
+    W_sum_with_fictive = np.zeros((nt, p.nl + 1))
+    W_sum_with_fictive[:, 1:] = W_sum
+    
+    MFA_with_fictive = np.zeros((nt, p.nl + 1))
+    MFA_with_fictive[:, 1:] = MFA
+    MFA_with_fictive[:, 0] = MFA[:, 0]  # La couche fictive a la même valeur que la première couche
+
+    X, Y = np.meshgrid(np.linspace(0, 1, p.nl+1), th)
+    
+    ###Utiliser W_sum pour ajuster les positions des couches
+    for k in range(nt):
+        X[k, :] = W_sum_with_fictive[k, :]
+        #X[k, :] = W_sum[k, :]
+    
+    plt.figure(14,figsize=(15/2.54, 10/2.54))
+    c=plt.pcolormesh(X*1e6, Y, MFA_with_fictive * 180 / np.pi, shading='auto', cmap='inferno_r',edgecolor='none')
+    plt.xlim([0,1])
+    colorbar = plt.colorbar(c)
+    colorbar.set_label(label=r'\textbf{$\phi^i$ [$\circ$]}', size=14)  # Augmenter la taille de la police
     plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
-    plt.ylabel(r"\textbf{MFA [$\circ$]}", fontsize=16)
-    plt.title(r"$\textbf{MFA profiles}$", fontsize=16)
-    #plt.legend(loc='best')
-    # Set grid and minor ticks
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.minorticks_on()
-    # Use LaTeX for tick labels (optional)
-    plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    plt.tight_layout()
-    dpi = 300  # Dots per inch
-    # Save the figure as a high-resolution JPEG
-    #plt.savefig("stress_profiles-W_cste.jpeg", dpi=dpi)
+    plt.ylabel(r"\textbf{$t$ [h]}", fontsize=16)
+    
+    
+    # Ajouter un insert pour montrer la courbe MFA en fonction de W_sum pour le dernier pas de temps
+    ax_insert = inset_axes(plt.gca(), width="40%", height="40%", loc='lower right', borderpad=2)
+    ax_insert.plot(W_sum_with_fictive[-1]*1e6, MFA_with_fictive[-1] * 180 / np.pi, label='Final time')
+    #ax_insert.set_xlabel('W_sum')
+    ax_insert.set_ylabel(r'\textbf{$\phi^i$ [$\circ$]}')
+    # ax_insert.legend()
+    
+    # Rendre l'insert transparent et ajouter une grille
+    ax_insert.patch.set_alpha(0.5)  # Rendre le fond transparent
+    ax_insert.grid(True)  # Ajouter une grille
+    #plt.savefig('MFA_stationnary.png',format='png', dpi=500) 
+    # plt.text(-0.1, 0.91, '($\t{a}$)', transform=ax.transAxes, fontsize=16,
+    #          verticalalignment='top', horizontalalignment='left')
+    # plt.savefig('MFA_non_stationnary_with_rotation.png',format='png', bbox_inches='tight', dpi=500) 
+    plt.show()
+    
+    #
+    
+    #########################   Kimograph stress #####################
+
+    # Utiliser pcolormesh pour tracer les données en fonction des positions réelles
+    # Créer une grille 2D pour les positions et les temps
+    # Ajouter une colonne fictive pour la couche 0
+    
+    sa_with_fictive = np.zeros((nt, p.nl + 1))
+    sa_with_fictive[:, 1:] = sa
+    sa_with_fictive[:, 0] = sa[:, 0]  # La couche fictive a la même valeur que la première couche
+   
+    plt.figure(15,figsize=(15/2.54, 10/2.54))
+    c=plt.pcolormesh(X*1e6, Y, sa_with_fictive/1e6, shading='auto', cmap='inferno_r',edgecolor='none')
+    plt.xlim([0,1])
+    colorbar = plt.colorbar(c)
+    colorbar.set_label(label=r'\textbf{$\sigma_a$ [MPa]}', size=14)  # Augmenter la taille de la police
+    plt.xlabel(r"\textbf{Position within the wall [µm]}", fontsize=16)
+    plt.ylabel(r"\textbf{$t$ [h]}", fontsize=16)
+    
+    
+    # Ajouter un insert pour montrer la courbe MFA en fonction de W_sum pour le dernier pas de temps
+    ax_insert = inset_axes(plt.gca(), width="40%", height="40%", loc='lower right', borderpad=2)
+    ax_insert.plot(W_sum_with_fictive[-1]*1e6, sa_with_fictive[-1]/1e6, label='Final time')
+    #ax_insert.set_xlabel('W_sum')
+    ax_insert.set_ylabel(r'\textbf{$\sigma_a$ [MPa]}')
+    # ax_insert.legend()
+    
+    # Rendre l'insert transparent et ajouter une grille
+    ax_insert.patch.set_alpha(0.5)  # Rendre le fond transparent
+    ax_insert.grid(True)  # Ajouter une grille
+    #plt.savefig('wall_stress_stationnary.png',format='png', dpi=500)
+    # plt.text(-0.1, 0.91, '($\t{b}$)', transform=ax.transAxes, fontsize=16,
+    #          verticalalignment='top', horizontalalignment='left')
+    # plt.savefig('wall_stress_non_stationnary_with_rotation.png',format='png', bbox_inches='tight',dpi=500)
+    #
 
 ## write some data in a .txt file    
 if parametric_study==True and save_data_parametric==True and multilayer_study==False:

@@ -14,17 +14,20 @@ class parameters:
         # activate wall synthesis regulation
         self.wall_regul = True
         
-        # force no MF rotation
+        # force no MF rotation (if True : no rotation of the MF)
         self.no_rotation = False
         
         # force a constant elongation rate
         self.force_elongation = True
-        self.G_forced = 8e-7 #for meca prop computations
+        self.G_forced = 1e-6 # 3e-7for meca prop computations in single layer
         
-        # change deposition angle
+        # change deposition angle 
+        #(if True: attempt to align deposition towards stress eigenvector
+        # or progressive linear shift in deposition angle)
+        # NB : initialization must probably be improved to use this feature
         self.change_deposition = False
         
-        # force pressure steps
+        # force pressure steps 
         self.pressure_steps = False
         self.p_init = 0.1e6
         self.deltaP = 0.1e6 # pressure steps
@@ -57,7 +60,11 @@ class parameters:
         self.MFA0_deg = 5 # initial MFA angle in degrees
         self.MFA0 = self.MFA0_deg*np.pi/180
         
-        # Hydraulic parameters
+        # final Micro-tubule angle
+        self.theta_MT_max = 45*np.pi/180
+        
+        # Hydraulic parameters 
+        # to compute water fluxes when elongation rate is not imposed
         self.kh = 1*1e-16 # hydraulic conduct in m/Pa/s [Dumais, new Phytol., 2021]
         self.Psi_src = 0 # (=P-PI)_{ext} : external (xylem) potential in Pa
         self.delta_PsiX = 0 # water source potential amplitude
@@ -65,6 +72,7 @@ class parameters:
         self.Pi0 = 0.8e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
         
         # Wall synthesis parameters [Friend et al, Nature com., 2022]
+        # in case wall synthesis is not regulated
         self.omega = 2.2e-4 # normalised rate of mass growth (kg/m3/s) at T0
         self.omega = 1*self.omega # custom value
         self.Eaw = 1.43 # activation energy for wall building (eV)
@@ -96,11 +104,12 @@ class parameters:
         # Physical constant
         self.Rg = 8.314 # Ideal gas constant
         
-        # Sugar transport
+        # Sugar transport 
+        # in case there is no osmoregulation
         self.eta_s = 2.6e-16 # sugar diffusion constant (m3/s) [Friend et al, Nature com., 2022]
         self.Cs_ext = 200 # sugar source conentration (mol/m3) [Uggla et al, Plant phy, 2001]
         
-        # some inital variables
+        # some initial variables
         VwaT0 =2*self.Wa0*self.Lz*(self.La-2*self.Wp0) # anticl. wall volume
         VwpT0 =2*self.Wp0*self.Lz*self.Lp # pericl. wall volume
         self.Vh0 = self.La*self.Lp*self.Lz - VwaT0 - VwpT0  #init. water volume

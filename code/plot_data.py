@@ -18,27 +18,26 @@ plt.rc('font', family='serif')
 # data2open = ['data_effect_MFA-forced_G.pkl']
 data2open = ['data_effect_MFA-fine.pkl','data_effect_MFA-fine-no_fish.pkl']
 # data2open = ['data_effect_MFA-fine.pkl']
-data2open = ['effect_AR.pkl']
-data2open = ['effect_eps0.pkl']
+#data2open = ['effect_AR.pkl']
+data2open = ['effect_Vf.pkl']
 # my_legend = ['30deg ','60','90deg']
-param2change = 'eps0' # as written here below in the ref_values class
-legend_title = r"$\varepsilon_0$"
+param2change = 'Vf' # as written here below in the ref_values class
+legend_title = r"$V_f$ [MPa]"
 legend_scaling = 1 # rescale legend values for easier reading
-xtitle = r"\textbf{MFA [°]}"
+xtitle = r"\textbf{$\Phi_0$ [°]}"
 
 treat_multilayer_case = True
 if treat_multilayer_case==True:
-    multi_file2open = 'multi-effect_eps0.pkl'
+    multi_file2open = 'multi-effect_Vf.pkl'
 
 # define some linestyle cycling
-lines = ["-","--","-.",":"]
+lines = ["-","--","-."]
 linecycler = cycle(lines)
 # define some markers cycling
 markers = ["x","v"]
 markercycler = cycle(markers)
 # define the color map
-cmap = plt.cm.cool
-
+cmap = plt.cm.viridis
 
 # function for reference values computations
 class ref_values:
@@ -150,6 +149,7 @@ for i in range(size): # loop to open the files one by one and plot things
         Y2 = np.zeros((nv2))
         Y12 = np.zeros((nv2))
         nu12 = np.zeros((nv2))
+        nu21 = np.zeros((nv2))
         
         # compute reference values for mechanical parameters
         ref = ref_values()
@@ -162,6 +162,7 @@ for i in range(size): # loop to open the files one by one and plot things
             Y2[v2] = ref.Y2 # save Y2
             Y12[v2] = ref.Y12
             nu12[v2] = ref.nu12 # save  nu12
+            nu21[v2] = ref.Q12/ref.Q11
             for v1 in range(nv1):
                 it1 = param[:,0]==value_first[v1]
                 it2 = param[:,1]==value_2nd[v2]
@@ -203,39 +204,48 @@ for i in range(size): # loop to open the files one by one and plot things
     ######################## Plot stuff ###########################
     # Normalize colors between 0 and 1 for even distribution across plots
     norm = plt.Normalize(vmin=0, vmax=len(E[0])-1)
-    
+
     plt.figure(1)
     for k in range(nv2):
+        #k=1
         color = cmap(norm(k))  # Get color based on normalized index
-        value = np.sqrt(100)*Y2[k]*Y1[k]/np.sqrt(100*Y1[k]**2-9*Y2[k]**2)
-        value = Y1[k]
-        plt.plot(value_first,sY[:,k]/1e6, color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
-        plt.plot([0, value_first[-1]], [sY_multi[k]/1e6,sY_multi[k]/1e6],color = color,linewidth=1.5,ls='--')
+        plt.plot(value_first,sY[:,k]/E[:,k], color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
+        if treat_multilayer_case==True:
+            plt.plot([0, value_first[-1]], [sY_multi[k]/1e6,sY_multi[k]/1e6],color = color,linewidth=1.5,ls='--')
         
-    plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
+    # plt.legend(value_2nd[1:]*legend_scaling,loc='best',title=legend_title)
     # plt.plot([0, value_first[-1]], [ref.Y1/1e6,ref.Y1/1e6],':k',linewidth=1.5)
     # plt.plot([0, value_first[-1]], [ref.nu12*ref.Y2/1e6, ref.nu12*ref.Y2/1e6],':r',linewidth=1.5)
     # plt.plot([0, value_first[-1]], [2.78, 2.78],':g',linewidth=1.5)
     # plt.plot([0, value_first[-1]], [0.98, 0.98],':b',linewidth=1.5)
-    #plt.yscale('log')
+    # plt.yscale('log')
     plt.xlabel(xtitle, fontsize=16)
-    plt.ylabel(r"\textbf{$\sigma_Y$ [MPa]}", fontsize=16)
-    plt.title(r"\textbf{MFA effect on yield stress}", fontsize=16)
+    plt.ylabel(r"\textbf{$\varepsilon_Y^a=\sigma_Y^a/E^a$ [-]}", fontsize=16)    
+    ax = plt.gca()
+    plt.text(-0.15, 1.05, '($\t{d}$)', transform=ax.transAxes, fontsize=16,
+                verticalalignment='top', horizontalalignment='left')
+    # plt.title(r"\textbf{MFA effect on apparent yield strain}", fontsize=16)
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.minorticks_on()
     # Use LaTeX for tick labels (optional)
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
+    # save figure
+    #plt.savefig('epsY.png',format='png', dpi=500)
     
         
     plt.figure(2)
     for k in range(nv2):
+        #k=k+1
+        #k=1
         color = cmap(norm(k))  # Get color based on normalized index
         plt.plot(value_first,E[:,k]/1e6, color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
-        plt.plot([0, value_first[-1]], [E_multi[k]/1e6,E_multi[k]/1e6],color = color,linewidth=1.5,ls='--')
+        if treat_multilayer_case==True:
+            plt.plot([0, value_first[-1]], [E_multi[k]/1e6,E_multi[k]/1e6],color = color,linewidth=1.5,ls='--')
         #plt.plot([0, value_first[-1]], [Q11[k]/1e6,Q11[k]/1e6],color = color,linewidth=1.5,ls='--')
-    plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
+    # plt.legend(value_2nd[1:]*legend_scaling,loc='best',title=legend_title)
+    # plt.yscale('log')
     # plt.plot([0, value_first[-1]], [Q11, Q11],':k',linewidth=1.5)
     # plt.plot([0, value_first[-1]], [Q22, Q22],':r',linewidth=1.5)
     # plt.plot([0, value_first[-1]], [83.3, 83.3],':g',linewidth=1.5)
@@ -243,20 +253,30 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.plot([0, value_first[-1]], [177.4, 177.4],':k',linewidth=1.5)
     # plt.plot([0, value_first[-1]], [12.8, 12.8],':k',linewidth=1.5)
     #plt.yscale('log')
+    plt.ylim([0,180])
     plt.xlabel(xtitle, fontsize=16)
-    plt.ylabel(r"\textbf{$E$ [MPa]}", fontsize=16)
-    plt.title(r"\textbf{MFA effect on Young's modulus}", fontsize=16)
+    plt.ylabel(r"\textbf{$E^a$ [MPa]}", fontsize=16)
+    #plt.title(r"\textbf{MFA effect on apparent Young's modulus}", fontsize=16)
+    # Get the current active axes
+    ax = plt.gca()
+    plt.text(-0.15, 1.05, '($\t{c}$)', transform=ax.transAxes, fontsize=16,
+            verticalalignment='top', horizontalalignment='left')
+    # plt.text(-1,7,'($\t{c}$)', fontsize=16)
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.minorticks_on()
     # Use LaTeX for tick labels (optional)
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
+    # save figure
+    #plt.savefig('Young.png',format='png', dpi=500)
     
     plt.figure(6)
     for k in range(nv2):
         color = cmap(norm(k))  # Get color based on normalized index
         plt.plot(value_first,(E[:,k]-Q22[k])/(Q11[k]-Q22[k]), color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
+        if treat_multilayer_case==True:
+            plt.plot([0, value_first[-1]], [(E_multi[k]-Q22[k])/(Q11[k]-Q22[k]), (E_multi[k]-Q22[k])/(Q11[k]-Q22[k])],color = color,linewidth=1.5,ls='--')
         # plt.plot([0, value_first[-1]], [Q11[k]/1e6,Q11[k]/1e6],color = color,linewidth=1.5,ls='--')
     plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
     # plt.plot([0, value_first[-1]], [Q11, Q11],':k',linewidth=1.5)
@@ -279,8 +299,15 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.figure(7)
     for k in range(nv2):
         color = cmap(norm(k))  # Get color based on normalized index
-        plt.plot(value_first,(sY[:,k]-Y2[k])/(Y1[k]-Y2[k]), color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
-
+        #♠vzero = (1+nu12[k]*nu21[k])*Y2[k]-nu12[k]*nu21[k]*Y1[k]
+        vzero = (1+0.05)*Y2[k]-0.05*Y1[k]
+        buff = 1+nu21[k]*(Y2[k]/Y1[k])**2*(nu21[k]-Y2[k]/Y1[k])
+        print(buff)
+        #vzero = Y2[k]*np.sqrt(1/buff)
+        #vzero = Y2[k]
+        plt.plot(value_first,(sY[:,k]-vzero)/(Y1[k]-vzero), color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
+        if treat_multilayer_case==True:
+            plt.plot([0, value_first[-1]], [(sY_multi[k]-vzero)/(Y1[k]-vzero),(sY_multi[k]-vzero)/(Y1[k]-vzero)],color = color,linewidth=1.5,ls='--')
     plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
     # plt.plot([0, value_first[-1]], [ref.Y1/1e6,ref.Y1/1e6],':k',linewidth=1.5)
     # plt.plot([0, value_first[-1]], [ref.nu12*ref.Y2/1e6, ref.nu12*ref.Y2/1e6],':r',linewidth=1.5)
@@ -288,7 +315,7 @@ for i in range(size): # loop to open the files one by one and plot things
     # plt.plot([0, value_first[-1]], [0.98, 0.98],':b',linewidth=1.5)
     #plt.yscale('log')
     plt.xlabel(xtitle, fontsize=16)
-    plt.ylabel(r"\textbf{$(\sigma_Y-Y_2)/(Y_1-Y_2)$}", fontsize=16)
+    plt.ylabel(r"\textbf{$(\sigma_Y-\sigma_Y (0))/(Y_1-\sigma_Y (0))$}", fontsize=16)
     plt.title(r"\textbf{MFA effect on yield stress}", fontsize=16)
     # Set grid and minor ticks
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
@@ -297,122 +324,123 @@ for i in range(size): # loop to open the files one by one and plot things
     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
     plt.tight_layout()
     
-    # plt.figure(3)
-    # for k in range(nv2):
-    #     color = cmap(norm(k))  # Get color based on normalized index
-    #     plt.plot(value_first,epsY[:,k], color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
-    # plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
-    # #plt.plot([0, param[-1]], [0.03, 0.03],':k',linewidth=1.5)
-    # # plt.plot([0, param[-1]], [177.4, 177.4],':k',linewidth=1.5)
-    # # plt.plot([0, param[-1]], [12.8, 12.8],':k',linewidth=1.5)
-    # #plt.yscale('log')
-    # plt.xlabel(r"\textbf{MFA [°]}", fontsize=16)
-    # plt.ylabel(r"\textbf{$\varepsilon_Y$ [-]}", fontsize=16)
-    # plt.title(r"\textbf{MFA effect on threshold deformation}", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
+#     # plt.figure(3)
+#     # for k in range(nv2):
+#     #     color = cmap(norm(k))  # Get color based on normalized index
+#     #     plt.plot(value_first,epsY[:,k], color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
+#     # plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
+#     # #plt.plot([0, param[-1]], [0.03, 0.03],':k',linewidth=1.5)
+#     # # plt.plot([0, param[-1]], [177.4, 177.4],':k',linewidth=1.5)
+#     # # plt.plot([0, param[-1]], [12.8, 12.8],':k',linewidth=1.5)
+#     # #plt.yscale('log')
+#     # plt.xlabel(r"\textbf{MFA [°]}", fontsize=16)
+#     # plt.ylabel(r"\textbf{$\varepsilon_Y$ [-]}", fontsize=16)
+#     # plt.title(r"\textbf{MFA effect on threshold deformation}", fontsize=16)
+#     # # Set grid and minor ticks
+#     # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+#     # plt.minorticks_on()
+#     # # Use LaTeX for tick labels (optional)
+#     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+#     # plt.tight_layout()
     
-    # if hasattr(data,"tau_visc")==True: 
-    #     plt.figure(4)
-    #     for k in range(nv2):
-    #         color = cmap(norm(k))  # Get color based on normalized index
-    #         plt.plot(value_first,tau_visc[:,k], color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
-    #     plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
-    #     # plt.plot([0, param[-1]], [5, 5],':k',linewidth=1.5)
-    #     # plt.plot([0, param[-1]], [177.4, 177.4],':k',linewidth=1.5)
-    #     # plt.plot([0, param[-1]], [12.8, 12.8],':k',linewidth=1.5)
-    #     #plt.yscale('log')
-    #     plt.xlabel(r"\textbf{MFA [°]}", fontsize=16)
-    #     plt.ylabel(r"\textbf{$tau_{visc}$ [-]}", fontsize=16)
-    #     plt.title(r"\textbf{MFA effect on viscous time constant}", fontsize=16)
-    #     # Set grid and minor ticks
-    #     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    #     plt.minorticks_on()
-    #     # Use LaTeX for tick labels (optional)
-    #     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    #     plt.tight_layout()
+#     # if hasattr(data,"tau_visc")==True: 
+#     #     plt.figure(4)
+#     #     for k in range(nv2):
+#     #         color = cmap(norm(k))  # Get color based on normalized index
+#     #         plt.plot(value_first,tau_visc[:,k], color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
+#     #     plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
+#     #     # plt.plot([0, param[-1]], [5, 5],':k',linewidth=1.5)
+#     #     # plt.plot([0, param[-1]], [177.4, 177.4],':k',linewidth=1.5)
+#     #     # plt.plot([0, param[-1]], [12.8, 12.8],':k',linewidth=1.5)
+#     #     #plt.yscale('log')
+#     #     plt.xlabel(r"\textbf{MFA [°]}", fontsize=16)
+#     #     plt.ylabel(r"\textbf{$tau_{visc}$ [-]}", fontsize=16)
+#     #     plt.title(r"\textbf{MFA effect on viscous time constant}", fontsize=16)
+#     #     # Set grid and minor ticks
+#     #     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+#     #     plt.minorticks_on()
+#     #     # Use LaTeX for tick labels (optional)
+#     #     plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+#     #     plt.tight_layout()
         
     
-    # plt.figure(5)
-    # for k in range(nv2):
-    #     color = cmap(norm(k))  # Get color based on normalized index
-    #     plt.plot(value_first,2*sY[:,k]*1e-6/(2e-5)/1e6, color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
-    # plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
-    # # plt.plot([0, value_first[-1]], [177.4, 177.4],':k',linewidth=1.5)
-    # # plt.plot([0, value_first[-1]], [12.8, 12.8],':k',linewidth=1.5)
-    # #plt.yscale('log')
-    # plt.xlabel(xtitle, fontsize=16)
-    # plt.ylabel(r"\textbf{$P_Y$ [MPa]}", fontsize=16)
-    # plt.title(r"\textbf{MFA effect on yield pressure}", fontsize=16)
-    # # Set grid and minor ticks
-    # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # plt.minorticks_on()
-    # # Use LaTeX for tick labels (optional)
-    # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
-    # plt.tight_layout()
+#     # plt.figure(5)
+#     # for k in range(nv2):
+#     #     color = cmap(norm(k))  # Get color based on normalized index
+#     #     plt.plot(value_first,2*sY[:,k]*1e-6/(2e-5)/1e6, color = color, linewidth=2,marker=next(markercycler),ls=next(linecycler))
+#     # plt.legend(value_2nd*legend_scaling,loc='best',title=legend_title)
+#     # # plt.plot([0, value_first[-1]], [177.4, 177.4],':k',linewidth=1.5)
+#     # # plt.plot([0, value_first[-1]], [12.8, 12.8],':k',linewidth=1.5)
+#     # #plt.yscale('log')
+#     # plt.xlabel(xtitle, fontsize=16)
+#     # plt.ylabel(r"\textbf{$P_Y$ [MPa]}", fontsize=16)
+#     # plt.title(r"\textbf{MFA effect on yield pressure}", fontsize=16)
+#     # # Set grid and minor ticks
+#     # plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+#     # plt.minorticks_on()
+#     # # Use LaTeX for tick labels (optional)
+#     # plt.tick_params(labelsize=12, which='both', top=True, bottom=True, left=True, right=True)
+#     # plt.tight_layout()
     
-################ perform the fits ############################
+# ################ perform the fits ############################
 
-print("Now I perform the fits")
-from scipy.optimize import curve_fit
-from scipy.stats import pearsonr
+# print("Now I perform the fits")
+# from scipy.optimize import curve_fit
+# from scipy.stats import pearsonr
 
-x = value_first # save angle
-y = (E[:,2]-Q22[2])/(Q11[2]-Q22[2])# save young modulus
-y = (sY[:,2]-Y2[2])/(Y1[2]-Y2[2])
-
-# Define the logistic function
-def logistic_func(x, L, k, x0):
-    return L/ (1 + np.exp(-k * (x - x0)))
+# x = value_first # save angle
+# y = (E[:,2]-Q22[2])/(Q11[2]-Q22[2])# save young modulus
+# vzero = (1+0.05)*Y2[2]-0.05*Y1[2]
+# y = (sY[:,2]-vzero)/(Y1[2]-vzero)
 
 # # Define the logistic function
-# def logistic_func(x, x0):
-#     return 1.01/ (1 + np.exp(-0.09* (x - x0)))
+# def logistic_func(x, L, k, x0):
+#     return L/ (1 + np.exp(-k * (x - x0)))
 
-# inital guess
-initial_guess = [1,0.09,55]
-#initial_guess = [55]
+# # # Define the logistic function
+# # def logistic_func(x, x0):
+# #     return 1.01/ (1 + np.exp(-0.09* (x - x0)))
 
-# Fit the logistic curve to the data
-popt, pcov = curve_fit(logistic_func, x, y, p0=initial_guess)
+# # inital guess
+# initial_guess = [1,0.09,55]
+# #initial_guess = [55]
 
-# Extract the fitted parameters
-L_fit, k_fit, x0_fit = popt
-#x0_fit = popt
+# # Fit the logistic curve to the data
+# popt, pcov = curve_fit(logistic_func, x, y, p0=initial_guess)
 
-# Generate the fitted curve
-y_fit = logistic_func(x, L_fit,  k_fit, x0_fit)
-#y_fit = logistic_func(x, x0_fit)
-# y_fit = logistic_func(x, 1,  0.12, 55)
+# # Extract the fitted parameters
+# L_fit, k_fit, x0_fit = popt
+# #x0_fit = popt
 
-# Calculate the Pearson correlation coefficient
-correlation, p_value = pearsonr(y, y_fit)
+# # Generate the fitted curve
+# y_fit = logistic_func(x, L_fit,  k_fit, x0_fit)
+# #y_fit = logistic_func(x, x0_fit)
+# # y_fit = logistic_func(x, 1,  0.12, 55)
 
-print("Pearson Correlation Coefficient:", correlation)
+# # Calculate the Pearson correlation coefficient
+# correlation, p_value = pearsonr(y, y_fit)
 
-# Assuming you have the fitted parameters L_fit, k_fit, and x0_fit
+# print("Pearson Correlation Coefficient:", correlation)
 
-# Create the equation string with placeholders for the parameters
-equation_str = r"$y = \frac{{L}}{{1 + e^{-{k}(x - {x_0})}}}$"
-parameters = f" L={L_fit:.3f}, k={k_fit:.3f}, $x_0$={x0_fit:.3f}"
-#parameters = f" x_0={x0_fit[0]:.3f}"
-reg = f"$R^2$={correlation:.4f}"
-# # Replace the placeholders with the actual values
-# equation_text = equation_str.format(L=L_fit, k=k_fit, x0=x0_fit)
+# # Assuming you have the fitted parameters L_fit, k_fit, and x0_fit
 
-# Plot the data and the fitted curve
-plt.figure(8)
-plt.plot(x, y, 'bo', label='Data')
-plt.plot(x, y_fit, 'r-', label='Fit')
-plt.xlabel('Angle')
-# Add the equation to the plot
-plt.text(20, 0.8, equation_str, fontsize=12,color='red')
-plt.text(5, 0.6, parameters, fontsize=12)
-plt.text(10, 0.4, reg, fontsize=12)
-plt.ylabel('Normalized Mechanical Property')
-plt.legend()
-plt.show()
+# # Create the equation string with placeholders for the parameters
+# equation_str = r"$y = \frac{{L}}{{1 + e^{-{k}(x - {x_0})}}}$"
+# parameters = f" L={L_fit:.3f}, k={k_fit:.3f}, $x_0$={x0_fit:.3f}"
+# #parameters = f" x_0={x0_fit[0]:.3f}"
+# reg = f"$R^2$={correlation:.4f}"
+# # # Replace the placeholders with the actual values
+# # equation_text = equation_str.format(L=L_fit, k=k_fit, x0=x0_fit)
+
+# # Plot the data and the fitted curve
+# plt.figure(8)
+# plt.plot(x, y, 'bo', label='Data')
+# plt.plot(x, y_fit, 'r-', label='Fit')
+# plt.xlabel('Angle')
+# # Add the equation to the plot
+# plt.text(20, 0.8, equation_str, fontsize=12,color='red')
+# plt.text(5, 0.6, parameters, fontsize=12)
+# plt.text(10, 0.4, reg, fontsize=12)
+# plt.ylabel('Normalized Mechanical Property')
+# plt.legend()
+# plt.show()

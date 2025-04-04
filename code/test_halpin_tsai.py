@@ -18,9 +18,12 @@ Gf = 6.06e9 # fiber shear modulus
 Gm = Em/(2*(1+num)) # matrix shear modulus
 
 # geometric parameters
-Vf = 0.05 # MF volume fraction
+Vf = 0.1 # MF volume fraction
 xi = 1.5 # reinforcement (1: hexagonal array ; 2: square array ; 1.5: random)
 AR = 100 # MF aspect ratio
+
+# Yield deformation
+eps0 = 0.03
 
 
 # Compute parameters from Halpin-Tsai equations

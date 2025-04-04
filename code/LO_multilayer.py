@@ -24,14 +24,14 @@ import itertools
 ############### Specify simulations parameters and output names
 
 # simulation parameters
-overwrite = True # True if you want to overwrite the existing file 
-param_study = True # True if you want to run a parametric study 
+overwrite = True # True if you want to overwrite the existing same file 
+param_study = False# True if you want to run a parametric study 
 folder_path = "../runs/" # folder in which you want to write the results
-number_parameter = 2 # 1 or 2 - more is not implemented so far
-name_1 = 'G_forced' # parameter name as listed in functions.py
-value_1 = [8e-7,10e-7] # parameter values
-name_2 = 'AR' # parameter name as listed exactly in functions.py
-value_2 = [10,100,1000,10000] # parameter values
+number_parameter = 2 # for param_study=True ; 1 or 2 - more is not implemented so far
+name_1 = 'MFA0_deg' # parameter name as listed in functions.py
+value_1 = np.arange(0,95,5) # parameter values
+name_2 = 'eps0' # parameter name as listed exactly in functions.py
+value_2 = [0.02] # parameter values
 
 # handle simulation number and output files
 file_list = []
@@ -47,13 +47,13 @@ if param_study==True: ##### in case of parametric study ######
             combinations = list(itertools.product(value_1 , value_2))    
             print ("There are " +str(len(combinations))+" simulations to run.")
             for i in range(len(combinations)):
-                filename ='multi-' + name_1+'-'+f"{combinations[i][0]*10**7:.3f}"+'-'+name_2+'-'+f"{combinations[i][1]:.3f}"+'.pkl'
+                filename = name_1+'-'+f"{combinations[i][0]:.3f}"+'-'+name_2+'-'+f"{combinations[i][1]:.3f}"+'.pkl'
                 file_list.append(filename)
         case _: # all other values
             print("Param number not handled currently")
 else:           
     # Specify the output filename for a single simulation
-    filename ='10l-G8e-7.pkl'
+    filename ='multi-classic.pkl'
     file_list.append(filename)
     
 
@@ -131,8 +131,9 @@ def dydt(t,y,p): # all physical equations for time integration
     
     # compute change in microtubules angle
     if (p.change_deposition==True):
-        dtheta_MTdt = (theta_p - theta_MT)/p.tau_MT
-    
+        #dtheta_MTdt = (theta_p - theta_MT)/p.tau_MT # adjustement towards stress eigenvector
+        dtheta_MTdt = (p.theta_MT_max -p.MFA0)/p.t_end # progressive linear shift
+        
     # Compute the total deformation and MFA related quantitites
     eps_t[:(iteration_count+1)] = (La - Ldepo[:(iteration_count+1)])/(Ldepo[:(iteration_count+1)]-2*WpT)    
     if (p.no_rotation==True): 
@@ -183,11 +184,11 @@ def dydt(t,y,p): # all physical equations for time integration
     # Compute Yield thresholds ( outputs a nlx3 matrix) and plastic components
     yields = compute_thresholds(p.radii, p.angle, s_rotated[0,:], s_rotated[1,:], s_rotated[2,:], plasticity)
     yields_tr = np.transpose(yields) # a 3xnl matrix
-    p_a = plasticity*np.maximum(s_rotated[0,:]-yields_tr[0,:],np.zeros((p.nl)))
-    p_l = plasticity*np.maximum(s_rotated[1,:]-yields_tr[1,:],np.zeros((p.nl)))
+    # p_a = plasticity*np.maximum(s_rotated[0,:]-yields_tr[0,:],np.zeros((p.nl)))
+    # p_l = plasticity*np.maximum(s_rotated[1,:]-yields_tr[1,:],np.zeros((p.nl)))
     # p_sh = plasticity*np.maximum(s_rotated[2,:]-yields_tr[2,:],np.zeros((p.nl)))
-    # p_a = plasticity*(s_rotated[0,:]-yields_tr[0,:])
-    # p_l = plasticity*(s_rotated[1,:]-yields_tr[1,:])
+    p_a = plasticity*(s_rotated[0,:]-yields_tr[0,:])
+    p_l = plasticity*(s_rotated[1,:]-yields_tr[1,:])
     p_sh = plasticity*(s_rotated[2,:]-yields_tr[2,:])
 
     # Compute the changes in wall stresses in the MF frame
