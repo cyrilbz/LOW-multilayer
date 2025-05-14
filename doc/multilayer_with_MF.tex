@@ -69,7 +69,7 @@ Assuming that the cell deformation is blocked in the longitudinal direction, tha
 	\bar{\bar{\varepsilon}}_{R,Z}= \left(\begin{matrix}
 		\dot{\varepsilon}_R\\
 		\dot{\varepsilon}_Z\\
-		\dot{\gamma}_{RZ2}/2
+		\dot{\gamma}_{RZ2}
 	\end{matrix}\right)
 =
 \left(\begin{matrix}
@@ -80,48 +80,35 @@ Assuming that the cell deformation is blocked in the longitudinal direction, tha
 \end{equation}
 This expression is true for all wall layers.
 \subsection{Rotation steps}
-The elongation rate tensor in a wall layer can be expressed in the rotated frame (rotation of angle $\theta$) through the following operation
+The elongation rate tensor in a wall layer can be expressed in the rotated frame (rotation of angle $\theta$) through the following operation  
 \begin{equation}
 	\left(\begin{matrix}
 		\dot{\varepsilon}_1\\
 		\dot{\varepsilon}_2\\
-		\dot{\gamma}_{12}/2
-	\end{matrix}\right)
+		\dot{\gamma}_{12}
+	\end{matrix}\right)^i
 =
-	\left(\begin{matrix}
-	\cos^2(\theta) & \sin^2(\theta) & 2\sin(\theta)\cos(\theta)\\
-	\sin^2(\theta) & \cos^2(\theta) & -2\sin(\theta)\cos(\theta)\\
-	-\sin(\theta)\cos(\theta) & \sin(\theta)\cos(\theta) & \cos^2(\theta)-\sin^2(\theta)
-\end{matrix}\right)
+R_{\varepsilon}(\theta^i)
 \left(\begin{matrix}
 	\dot{\varepsilon}_a\\
 	0\\
 	0
-\end{matrix}\right).
+\end{matrix}\right),
 \end{equation}
-Replacing $\theta$ by $\pi/2-\phi^i$ leads to
+with (\citet{aga17}, p190)
 \begin{equation}
-	\boxed{
-	\left(\begin{matrix}
-		\dot{\varepsilon}_1\\
-		\dot{\varepsilon}_2\\
-		\dot{\gamma}_{12}/2
-	\end{matrix}\right)^i
+R_{\varepsilon}(\theta)
 	=
 	\left(\begin{matrix}
-		\sin^2(\phi^i) & \cos^2(\phi^i) & 2\cos(\phi^i)\sin(\phi^i)\\
-		\cos^2(\phi^i) & \sin^2(\phi^i) & -2\cos(\phi^i)\sin(\phi^i)\\
-		-\cos(\phi^i)\sin(\phi^i) & \cos(\phi^i)\sin(\phi^i) & \sin^2(\phi^i)-\cos^2(\phi^i)
-	\end{matrix}\right)
-	\left(\begin{matrix}
-		\dot{\varepsilon}_a\\
-		0\\
-		0
-	\end{matrix}\right)},
+	\cos^2(\theta) & \sin^2(\theta) & \sin(\theta)\cos(\theta)\\
+	\sin^2(\theta) & \cos^2(\theta) & -\sin(\theta)\cos(\theta)\\
+	-2\sin(\theta)\cos(\theta) & 2\sin(\theta)\cos(\theta) & \cos^2(\theta)-\sin^2(\theta)
+\end{matrix}\right)
+,
 \end{equation}
-which must be computed for every wall layer.
+and $\theta^i=\pi/2-\phi^i$.
 
-The stress tensor components in the reference frame can be computed from the stress tensor components in the MF frame using a rotation of angle $-\theta=-(\pi/2-\phi^i)$,
+The stress tensor components in the reference frame can be computed from the stress tensor components in the MF frame using 
 \begin{equation}
 	\boxed{
 	\left(\begin{matrix}
@@ -130,17 +117,25 @@ The stress tensor components in the reference frame can be computed from the str
 		\dot{\tau}_{RZ}
 	\end{matrix}\right)^i
 	=
-	\left(\begin{matrix}
-		\sin^2(\phi^i) & \cos^2(\phi^i) & -2\cos(\phi^i)\sin(\phi^i)\\
-		\cos^2(\phi^i) & \sin^2(\phi^i) & 2\cos(\phi^i)\sin(\phi^i)\\
-		\cos(\phi^i)\sin(\phi^i) & -\cos(\phi^i)\sin(\phi^i) & \sin^2(\phi^i)-\cos^2(\phi^i)
-	\end{matrix}\right)
+R_{\sigma}(\theta^i)
 	\left(\begin{matrix}
 	\dot{\sigma}_1\\
 	\dot{\sigma}_2\\
 	\dot{\tau}_{12}
-\end{matrix}\right)^i}.
+\end{matrix}\right)^i},
 \end{equation}
+with (\citet{aga17}, p190) 
+\begin{equation}
+	R_{\sigma}(\theta)
+	=
+	\left(\begin{matrix}
+		\cos^2(\theta) & \sin^2(\theta) & 2\sin(\theta)\cos(\theta)\\
+		\sin^2(\theta) & \cos^2(\theta) & -2\sin(\theta)\cos(\theta)\\
+		-\sin(\theta)\cos(\theta) & \sin(\theta)\cos(\theta) & \cos^2(\theta)-\sin^2(\theta)
+	\end{matrix}\right)
+	,
+\end{equation}
+and $\theta^i=\phi^i-\pi/2$.
 \subsection{Constitutive equation}
 \subsubsection{General form}
 We assume that the mechanical behaviour of the ensemble fibre + gel within each wall layer is similar to a Bingham fluid and that we are in plane stress conditions, i.e.,
@@ -241,7 +236,7 @@ In the previous equation, $Y_1$ and $Y_2$ are the tensile or compressive yield s
 
 Assuming that the different yield stresses can be computed from the elastic theory using an isotropic strain threshold, one obtains
 \begin{equation}
-	\left(\frac{\sigma_1^i}{C_{11}}\right)^2 - \frac{\sigma_1^i \sigma_2^i}{C_{11}^2} + \left(\frac{\sigma_2^i}{C_{22}}\right)^2 + \left(\frac{\tau_{12}^i}{C_{12}}\right)^2 <\varepsilon_0^2,
+	\left(\frac{\sigma_1^i}{Q_{11}}\right)^2 - \frac{\sigma_1^i \sigma_2^i}{Q_{11}^2} + \left(\frac{\sigma_2^i}{Q_{22}}\right)^2 + \left(\frac{\tau_{12}^i}{Q_{66}}\right)^2 <\varepsilon_0^2,
 \end{equation}
 where $\varepsilon_0$ is the strain threshold. 
 
@@ -302,7 +297,7 @@ In our case, and for a given wall layer, the ellipsoid equation at the minimal d
 		\left(\frac{\beta_1}{Y_1}\right)^2 - \frac{\beta_1 \beta_2}{Y_1^2} + \left(\frac{\beta_2}{Y_2}\right)^2 + \left(\frac{\beta_{12}}{Y_{12}}\right)^2 -1=0,
 \end{equation}
 which can be compared to Eq. (\ref{ellipsoid}).
-We must use a change of variable to be able to use the previous solution to our case. Recognizing that our ellipsoid underwent a rotation of angle $\alpha$ around the $\tau_{12}$ axis (writing the ellipsoid equation in a matrix form, $\sigma^T\overline{\overline{A}}\sigma=1$, one can see that in our case the matrix is not diagonal and that the $\tau_{12}$ axis is an eigenvector), we can write
+We must use a change of variable to be able to use the previous solution to our case. Recognizing that our ellipsoid underwent a rotation of angle $\alpha$ around the $\tau_{12}$ axis (writing the ellipsoid equation in a matrix form, $\sigma^T\overline{\overline{A}}\sigma=1$, one can see that in our case the matrix $\overline{\overline{A}}$ is not diagonal and that the $\tau_{12}$ axis is an eigenvector), we can write
 \begin{align}
 	\beta_1 &= \cos(\alpha) x_1 + \sin({\alpha}) x_2, \nonumber \\
 	\beta_2 &= -\sin(\alpha) x_1 + \cos(\alpha) x_2,  \\
