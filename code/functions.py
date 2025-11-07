@@ -69,7 +69,7 @@ class parameters:
         self.Psi_src = 0 # (=P-PI)_{ext} : external (xylem) potential in Pa
         self.delta_PsiX = 0 # water source potential amplitude
         self.P_ext = 0 # external pressure  
-        self.Pi0 = 0.8e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
+        self.Pi0 = 0.2e6 # initial osmotic potential in Pa [Uggla et al, Plant phy, 2001]
         
         # Wall synthesis parameters [Friend et al, Nature com., 2022]
         # in case wall synthesis is not regulated
@@ -94,7 +94,7 @@ class parameters:
     
         # Simulation parameters
         self.t0 = 0
-        self.t_end = 1000*3600 # final time (s)
+        self.t_end = 500*3600 # final time (s)
         self.dt = 0.1*3600 # time step at which data is saved (s) (not the actual time step)
         
         # Number of layers

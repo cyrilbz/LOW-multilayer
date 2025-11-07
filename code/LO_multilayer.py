@@ -53,7 +53,7 @@ if param_study==True: ##### in case of parametric study ######
             print("Param number not handled currently")
 else:           
     # Specify the output filename for a single simulation
-    filename ='multi-classic.pkl'
+    filename ='test_500h.pkl'
     file_list.append(filename)
     
 
